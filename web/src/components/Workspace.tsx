@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Bug, HelpCircle, Loader2, RotateCcw, ShieldAlert, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { api, AskResponse, Turn } from "../api";
 import ResultView from "./ResultView";
 
@@ -18,17 +18,31 @@ interface Entry {
   error?: string;
 }
 
+type StampKind = { text: string; color: string };
+
+export function stampFor(e: Entry): StampKind | null {
+  if (e.error) return { text: "Failed", color: "text-stamp" };
+  const r = e.response;
+  if (!r) return null;
+  if (r.status === "clarification") return { text: "Needs detail", color: "text-carbon" };
+  if (r.status === "refused" || r.status === "blocked") return { text: "Refused", color: "text-stamp" };
+  if (r.status !== "success") return { text: "Failed", color: "text-stamp" };
+  if (r.attempts > 1) return { text: "Fixed & re-run", color: "text-carbon" };
+  return { text: "Answered", color: "text-ledger" };
+}
+
 export default function Workspace() {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [injectFault, setInjectFault] = useState(false);
   const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [entries]);
+    inputRef.current?.focus();
+  }, [selected]);
 
   const history = (): Turn[] =>
     entries.flatMap((e) => [
@@ -43,6 +57,7 @@ export default function Workspace() {
     setBusy(true);
     const idx = entries.length;
     setEntries((prev) => [...prev, { question }]);
+    setSelected(idx);
     try {
       const response = await api.ask(question, history(), conversationId, injectFault);
       setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, response } : e)));
@@ -53,55 +68,76 @@ export default function Workspace() {
     }
   }
 
-  function reset() {
+  function startOver() {
     setEntries([]);
+    setSelected(null);
     setConversationId(crypto.randomUUID());
   }
 
+  const current = selected !== null ? entries[selected] : null;
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-      <section className="min-w-0 space-y-4">
-        {entries.length === 0 && (
-          <div className="card p-6">
-            <h1 className="text-xl font-semibold">Ask a question about two years of sales</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              RetailIQ writes SQL, runs it on a read-only copy of the data and shows exactly what it did. Cancellations,
-              returns and unknown customers are handled by documented rules.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {SUGGESTED.map((s) => (
-                <button key={s} onClick={() => submit(s)} className="rounded-full border border-slate-200 px-3 py-1.5 text-sm hover:border-brand-500 hover:text-brand-700">
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {entries.map((e, i) => (
-          <div key={i} className="space-y-3">
-            <div className="flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-brand-600 px-4 py-2 text-sm text-white">{e.question}</div>
-            </div>
-            {!e.response && !e.error && (
-              <div className="card flex items-center gap-2 p-4 text-sm text-slate-500">
-                <Loader2 className="animate-spin" size={16} /> Planning, writing SQL and running it…
-              </div>
+    <div className="space-y-4">
+      <div className="sheet grid min-h-[520px] md:grid-cols-[230px_10px_1fr]">
+        {/* Counterfoils: one stub per question, in the order asked. */}
+        <aside className="border-b border-rule bg-[#FAFAFD] md:border-b-0">
+          <div className="flex items-baseline justify-between px-4 pb-2 pt-4">
+            <span className="text-sm font-semibold">This session</span>
+            {entries.length > 0 && (
+              <button onClick={startOver} className="text-[13px] text-muted underline-offset-2 hover:text-carbon hover:underline">
+                Start over
+              </button>
             )}
-            {e.error && <div className="card border-rose-200 p-4 text-sm text-rose-700">Request failed: {e.error}</div>}
-            {e.response && <ResponseCard r={e.response} onOption={(o) => submit(o)} disabled={busy || i !== entries.length - 1} />}
           </div>
-        ))}
-        <div ref={bottomRef} />
+          {entries.length === 0 ? (
+            <p className="px-4 pb-4 text-[13px] leading-relaxed text-muted">Each question you ask is kept here as a stub, so you can go back to it.</p>
+          ) : (
+            <ol className="flex gap-0 overflow-x-auto md:block md:max-h-[640px] md:overflow-y-auto">
+              {entries.map((e, i) => {
+                const s = stampFor(e);
+                return (
+                  <li key={i} className="min-w-[200px] md:min-w-0">
+                    <button
+                      onClick={() => setSelected(i)}
+                      className={`block w-full border-l-[3px] px-4 py-3 text-left transition-colors ${
+                        selected === i ? "border-carbon bg-carbon-wash/70" : "border-transparent hover:bg-carbon-wash/40"
+                      }`}
+                    >
+                      <span className="narrow text-[15px] font-bold text-muted">No. {String(i + 1).padStart(3, "0")}</span>
+                      <span className="mt-0.5 line-clamp-2 block text-[13.5px] leading-snug">{e.question}</span>
+                      <span className={`mt-1 block text-xs ${s ? s.color : "text-muted"}`}>{s ? s.text : "Working on it…"}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </aside>
 
-        <form
-          onSubmit={(ev) => {
-            ev.preventDefault();
-            submit(input);
-          }}
-          className="card sticky bottom-4 flex items-end gap-2 p-2"
-        >
+        <div className="perforation hidden bg-sheet md:block" aria-hidden />
+        <div className="perforation-h h-2.5 md:hidden" aria-hidden />
+
+        {/* The bill: the current answer. */}
+        <section className="min-w-0 px-5 py-6 sm:px-8">
+          {!current && <EmptyBill onAsk={submit} />}
+          {current && <Bill entry={current} onOption={submit} busy={busy} isLatest={selected === entries.length - 1} />}
+        </section>
+      </div>
+
+      <form
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          submit(input);
+        }}
+        className="sheet z-10 md:sticky md:bottom-3"
+      >
+        <label htmlFor="question" className="sr-only">
+          Your question
+        </label>
+        <div className="flex items-end gap-3 px-4 pt-3">
           <textarea
+            id="question"
+            ref={inputRef}
             value={input}
             onChange={(ev) => setInput(ev.target.value)}
             onKeyDown={(ev) => {
@@ -111,85 +147,87 @@ export default function Workspace() {
               }
             }}
             rows={1}
-            placeholder={entries.length ? "Ask a follow-up, e.g. “now only for Germany”" : "Ask about revenue, returns, customers, countries…"}
-            className="max-h-40 min-h-[40px] flex-1 resize-none rounded-lg px-3 py-2 text-sm outline-none"
+            placeholder={entries.length ? "Ask a follow-up, like “now only for Germany”" : "Ask about revenue, returns, customers or countries"}
+            className="max-h-40 min-h-[44px] flex-1 resize-none border-b-2 border-ink bg-transparent px-1 py-2 text-[17px] outline-none placeholder:text-muted/70 focus:border-carbon"
           />
-          <button disabled={busy || !input.trim()} className="grid h-10 w-10 place-items-center rounded-lg bg-brand-600 text-white disabled:opacity-40" aria-label="Ask">
-            {busy ? <Loader2 className="animate-spin" size={18} /> : <ArrowUp size={18} />}
+          <button disabled={busy || !input.trim()} className="btn-carbon mb-1 flex items-center gap-2">
+            {busy && <Loader2 className="animate-spin" size={15} />}
+            {busy ? "Working" : "Ask"}
           </button>
-        </form>
-      </section>
-
-      <aside className="space-y-4">
-        <div className="card p-4 text-sm">
-          <div className="font-semibold">Session</div>
-          <p className="mt-1 text-xs text-slate-500">Follow-ups use the last few turns as context.</p>
-          <button onClick={reset} className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand-700">
-            <RotateCcw size={14} /> New conversation
-          </button>
-          <label className="mt-4 flex items-start gap-2 text-xs">
-            <input type="checkbox" checked={injectFault} onChange={(e) => setInjectFault(e.target.checked)} className="mt-0.5" />
-            <span>
-              <span className="flex items-center gap-1 font-medium"><Bug size={12} /> Demo: inject an SQL fault</span>
-              <span className="text-slate-500">Corrupts a column name in the first SQL so you can watch the agent inspect the error and retry.</span>
-            </span>
-          </label>
         </div>
-        {entries.length > 0 && (
-          <div className="card p-4 text-sm">
-            <div className="font-semibold">Try next</div>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {SUGGESTED.map((s) => (
-                <button key={s} onClick={() => submit(s)} disabled={busy} className="text-left text-xs text-slate-600 hover:text-brand-700">
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </aside>
+        <label className="flex cursor-pointer items-center gap-2 px-4 pb-3 pt-2 text-[13px] text-muted">
+          <input type="checkbox" checked={injectFault} onChange={(e) => setInjectFault(e.target.checked)} className="accent-carbon" />
+          Demo mode: break a column name in the first SQL, to show the agent spotting the error and retrying
+        </label>
+      </form>
     </div>
   );
 }
 
-function ResponseCard({ r, onOption, disabled }: { r: AskResponse; onOption: (o: string) => void; disabled: boolean }) {
-  if (r.status === "clarification") {
-    return (
-      <div className="card border-amber-200 bg-amber-50/50 p-4">
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">
-          <HelpCircle size={14} /> Clarification needed
-        </div>
-        <p className="mt-1 text-sm">{r.answer}</p>
-        {!!r.options?.length && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {r.options.map((o) => (
-              <button key={o} disabled={disabled} onClick={() => onOption(o)} className="rounded-full border border-amber-300 bg-white px-3 py-1 text-sm hover:bg-amber-100 disabled:opacity-50">
-                {o}
-              </button>
-            ))}
-          </div>
+function EmptyBill({ onAsk }: { onAsk: (q: string) => void }) {
+  return (
+    <div className="max-w-2xl">
+      <h1 className="wide text-[clamp(28px,4.2vw,44px)] font-extrabold leading-[1.02] tracking-tight">
+        What do you want to know about the shop's sales?
+      </h1>
+      <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
+        Two years of invoices from a UK online gift shop. Cancelled orders, returns and customers without an ID are counted the same way every
+        time, and every answer shows the SQL that produced it.
+      </p>
+      <div className="margin-rule mt-8">
+        <p className="mb-1 text-sm font-semibold">Start with one of these</p>
+        {SUGGESTED.map((s) => (
+          <button key={s} onClick={() => onAsk(s)} className="ruled-line text-[15px]">
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Bill({ entry, onOption, busy, isLatest }: { entry: Entry; onOption: (q: string) => void; busy: boolean; isLatest: boolean }) {
+  const r = entry.response;
+  const s = stampFor(entry);
+  return (
+    <article>
+      <div className="flex items-start justify-between gap-4">
+        <p className="max-w-2xl text-[15px] italic text-muted">“{entry.question}”</p>
+        {s && (
+          <span key={entry.question + s.text} className={`stamp stamp-in shrink-0 ${s.color}`}>
+            {s.text}
+          </span>
         )}
       </div>
-    );
-  }
-  if (r.status === "refused" || r.status === "blocked") {
-    return (
-      <div className="card border-rose-200 bg-rose-50/50 p-4">
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700">
-          <ShieldAlert size={14} /> {r.status === "blocked" ? "Blocked by SQL validator" : "Request refused"}
+
+      {!r && !entry.error && (
+        <div className="mt-6 flex items-center gap-3 text-[15px] text-muted">
+          <Loader2 className="animate-spin text-carbon" size={18} /> Reading the question, writing SQL and running it on the ledger…
         </div>
-        <p className="mt-1 text-sm">{r.answer}</p>
-        {r.sql && <pre className="mt-2 overflow-x-auto rounded bg-white p-2 font-mono text-xs">{r.sql}</pre>}
-      </div>
-    );
-  }
-  return (
-    <div className="card p-4">
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand-700">
-        <Sparkles size={14} /> {r.title || "Answer"}
-      </div>
-      <p className="mt-1 text-sm leading-relaxed">{r.answer}</p>
-      <ResultView r={r} />
-    </div>
+      )}
+
+      {entry.error && <p className="mt-5 text-[15px] text-stamp">The server didn't respond: {entry.error}. Check that the API is running, then ask again.</p>}
+
+      {r && (
+        <>
+          <p className={`mt-4 max-w-3xl leading-snug ${r.status === "success" && r.answer.length < 160 ? "text-[24px] font-medium" : "text-[18px]"}`}>{r.answer}</p>
+
+          {r.status === "clarification" && !!r.options?.length && (
+            <div className="margin-rule mt-6 max-w-xl">
+              <p className="mb-1 text-sm font-semibold">Pick what you meant</p>
+              {r.options.map((o) => (
+                <button key={o} disabled={busy || !isLatest} onClick={() => onOption(o)} className="ruled-line text-[15px] disabled:opacity-50">
+                  {o}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {(r.status === "refused" || r.status === "blocked") && r.sql && <pre className="carbon-copy mt-5">{r.sql}</pre>}
+
+          {r.status === "success" && <ResultView r={r} />}
+        </>
+      )}
+    </article>
   );
 }

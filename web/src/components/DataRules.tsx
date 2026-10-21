@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 
-const PLAIN_RULES: { title: string; body: string }[] = [
-  { title: "Cancellations", body: "Invoice numbers starting with “C” are cancellations / credit notes. They are excluded from sales and counted separately. “Revenue excluding cancelled invoices” means sale lines only." },
-  { title: "Returns", body: "Returned items appear on “C” invoices with negative quantity. They are never counted as sales. Net revenue = sales minus these returns. “Returned most” ranks by units; “returned most often” ranks by number of return invoices." },
-  { title: "Missing customers", body: "About 20% of lines have no customer ID. They stay in totals (revenue, country revenue) but are excluded from customer rankings and customer counts, and the answer says so." },
-  { title: "Non-product codes", body: "Postage (POST, DOT), manual adjustments (M), bank charges, Amazon fees, samples, discounts, test and gift-voucher codes are excluded from product rankings but kept in transaction totals." },
-  { title: "Stock adjustments & bad debt", body: "Negative quantities without a “C” invoice (damaged / lost stock, price £0) and “A” bad-debt adjustment invoices are neither sales nor returns." },
-  { title: "Money & dates", body: "Line value = quantity × unit price, in GBP (£). Years are calendar years. “Last quarter” means the last complete quarter in the data (Q3 2011: Jul–Sep), not today's date, because the data ends on 9 Dec 2011." },
-  { title: "Ambiguity", body: "If a question depends on an undefined metric (e.g. “best customers”, “top products”, “how are we doing”), the agent asks which metric to use instead of guessing." },
-  { title: "Safety", body: "The agent only runs one SELECT at a time on a read-only DuckDB connection. SQL is parsed with sqlglot; writes, multiple statements, file/network functions and other tables are blocked." },
+const RULES: { term: string; body: string }[] = [
+  { term: "Cancelled invoices", body: "Invoice numbers starting with C are cancellations or credit notes. They never count as sales and are counted separately when you ask about them. “Revenue excluding cancelled invoices” means sale lines only." },
+  { term: "Returns", body: "Returned items sit on C invoices with a negative quantity. Net revenue is sales minus these returns. “Returned most” ranks products by units; “returned most often” ranks them by the number of return invoices." },
+  { term: "Customers without an ID", body: "About one line in five has no customer ID. Those lines stay in totals such as revenue by country, but are left out of customer rankings and customer counts, and the answer says so." },
+  { term: "Things that aren't products", body: "Postage, manual adjustments, bank charges, Amazon fees, samples, discounts, test codes and gift vouchers are left out of product rankings and kept in transaction totals." },
+  { term: "Stock write-offs and bad debt", body: "Negative quantities without a C invoice are damaged or lost stock at £0. Invoices starting with A are bad-debt adjustments. Neither is a sale or a return." },
+  { term: "Money", body: "Line value is quantity times unit price, in pounds sterling, rounded to the penny." },
+  { term: "Dates", body: "Years are calendar years. The data ends on 9 December 2011, so “last quarter” means July to September 2011, the last complete quarter, and the answer says so." },
+  { term: "Vague questions", body: "If the answer depends on a measure you didn't name, such as “best customers” or “top products”, the agent asks which one you mean instead of picking for you." },
+  { term: "Safety", body: "The agent can only read. Each query is parsed before it runs; anything that writes, runs more than one statement, opens files or reaches other tables is refused, and the database itself is opened read-only." },
 ];
 
 export default function DataRules() {
@@ -21,40 +22,48 @@ export default function DataRules() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <div className="card p-5">
-        <h1 className="text-xl font-semibold">How RetailIQ treats messy retail data</h1>
-        <p className="mt-1 text-sm text-slate-500">The same rules feed the agent prompt and the trap-suite reference SQL, so answers and tests use one definition.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {PLAIN_RULES.map((r) => (
-            <div key={r.title} className="rounded-lg border border-slate-200 p-3">
-              <div className="text-sm font-semibold">{r.title}</div>
-              <p className="mt-1 text-sm text-slate-600">{r.body}</p>
+    <div className="space-y-6">
+      <section className="sheet px-5 py-7 sm:px-8">
+        <h1 className="wide max-w-3xl text-[clamp(26px,3.6vw,38px)] font-extrabold leading-[1.05] tracking-tight">How the shop's messy records are counted</h1>
+        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
+          The same rules go into the agent's instructions and into the hand-written SQL the tests are checked against, so both always use one definition.
+        </p>
+        <dl className="mt-8 border-t-[3px] border-double border-ink">
+          {RULES.map((r) => (
+            <div key={r.term} className="grid gap-1 border-b border-rule py-4 md:grid-cols-[260px_1fr] md:gap-8">
+              <dt className="text-[16px] font-bold">{r.term}</dt>
+              <dd className="max-w-2xl text-[15px] leading-relaxed text-ink/85">{r.body}</dd>
             </div>
           ))}
-        </div>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="card min-w-0 p-5">
-          <div className="text-sm font-semibold">Exact rules given to the agent</div>
-          <pre className="mt-2 max-h-[480px] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-3 font-mono text-[11px] leading-relaxed text-slate-100">
-            {rules ? `${rules.data_rules}\n\n${rules.ambiguity_rules}` : "loading…"}
-          </pre>
-        </div>
-        <div className="card min-w-0 p-5">
-          <div className="text-sm font-semibold">Schema {schema && <span className="font-normal text-slate-500">· {schema.row_count.toLocaleString()} rows</span>}</div>
-          <table className="mt-2 w-full text-left text-xs">
+        </dl>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        <section className="sheet min-w-0 px-5 py-6 sm:px-8">
+          <h2 className="text-lg font-bold">The exact instructions the agent gets</h2>
+          <pre className="carbon-copy mt-3 max-h-[520px] whitespace-pre-wrap">{rules ? `${rules.data_rules}\n\n${rules.ambiguity_rules}` : "Loading…"}</pre>
+        </section>
+        <section className="sheet min-w-0 px-5 py-6 sm:px-8">
+          <h2 className="text-lg font-bold">The transactions table</h2>
+          {schema && <p className="mt-1 text-[13px] text-muted">{schema.row_count.toLocaleString("en-GB")} rows, one per invoice line</p>}
+          <table className="ledger mt-3 w-full text-[13.5px]">
+            <thead>
+              <tr>
+                <th>Column</th>
+                <th>Type</th>
+              </tr>
+            </thead>
             <tbody>
               {schema?.tables[0].columns.map((c) => (
-                <tr key={c.name} className="border-t border-slate-100">
-                  <td className="py-1.5 font-mono">{c.name}</td>
-                  <td className="py-1.5 text-slate-500">{c.type}</td>
+                <tr key={c.name}>
+                  <td className="font-mono text-[12.5px]">{c.name}</td>
+                  <td className="text-muted">{c.type.toLowerCase()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {rules && <p className="mt-3 text-xs text-slate-500">Non-product codes: {rules.non_product_codes.join(", ")}, plus gift_*, TEST*, ADJUST*.</p>}
-        </div>
+          {rules && <p className="mt-3 text-[13px] leading-relaxed text-muted">Codes treated as non-products: {rules.non_product_codes.join(", ")}, and any code starting with gift_, TEST or ADJUST.</p>}
+        </section>
       </div>
     </div>
   );

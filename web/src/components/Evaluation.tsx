@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { CheckCircle2, ChevronRight, Loader2, Play, XCircle } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { api, EvalRun, TestCase, TestResult } from "../api";
 import { SortableTable, SqlInspector } from "./ResultView";
 
@@ -15,7 +15,7 @@ export default function Evaluation() {
     api.savedResults().then(setSaved).catch(() => setSaved(null));
   }, []);
 
-  // Run tests one request at a time so a long suite never hits serverless time limits.
+  // One request per test keeps each call well inside serverless time limits.
   async function runAll() {
     setLive({});
     for (const t of suite) {
@@ -30,103 +30,129 @@ export default function Evaluation() {
     setRunning(null);
   }
 
-  const liveResults = Object.values(live);
-  const showing: Record<string, TestResult> = liveResults.length ? live : Object.fromEntries((saved?.results ?? []).map((r) => [r.id, r]));
+  const liveCount = Object.keys(live).length;
+  const showing: Record<string, TestResult> = liveCount ? live : Object.fromEntries((saved?.results ?? []).map((r) => [r.id, r]));
   const results = Object.values(showing);
   const passed = results.filter((r) => r.passed).length;
   const amb = results.filter((r) => r.check === "clarify");
-  const trapCount = suite.filter((t) => ["cancellations", "returns", "ambiguity", "missing customers"].includes(t.category)).length;
 
   return (
-    <div className="space-y-4">
-      <div className="card flex flex-wrap items-center gap-6 p-5">
-        <div className="min-w-[240px] flex-1">
-          <h1 className="text-xl font-semibold">Trap-question suite</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {suite.length} team-written questions ({trapCount} on cancellations, returns, missing customers or ambiguity). Each answer is
-            compared with hand-written reference SQL run on the same database. Tolerance: £0.01 / exact counts; rankings must match the
-            reference top-k.
+    <div className="sheet px-5 py-7 sm:px-8">
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div className="max-w-2xl">
+          <h1 className="wide text-[clamp(26px,3.6vw,38px)] font-extrabold leading-[1.05] tracking-tight">
+            {suite.length || 15} questions written to trip the agent up
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-muted">
+            Cancelled invoices, returns, customers without an ID, vague wording and a request to delete data. Each answer is checked against SQL we
+            wrote by hand: totals must match to the penny, rankings must match the reference top 5, and vague questions must be asked back.
           </p>
         </div>
-        <Stat label="Passed" value={results.length ? `${passed}/${results.length}` : "–"} />
-        <Stat label="Execution accuracy" value={results.length ? `${Math.round((passed / results.length) * 100)}%` : "–"} />
-        <Stat label="Asked back when ambiguous" value={amb.length ? `${amb.filter((r) => r.passed).length}/${amb.length}` : "–"} />
-        <button onClick={runAll} disabled={!!running || !suite.length} className="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-          {running ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-          {running ? `Running ${running}…` : "Run suite live"}
+        <button onClick={runAll} disabled={!!running || !suite.length} className="btn-carbon flex items-center gap-2">
+          {running && <Loader2 size={15} className="animate-spin" />}
+          {running ? `Running ${running}` : `Run all ${suite.length} tests now`}
         </button>
       </div>
-      <div className="text-xs text-slate-500">
-        {liveResults.length
-          ? `Showing live run (${liveResults.length}/${suite.length} done).`
-          : saved
-            ? `Showing last saved run from ${new Date(saved.run_at).toLocaleString()} (eval/results.json). Click "Run suite live" to re-run against the deployed agent.`
-            : "No saved run yet."}
-      </div>
 
-      <div className="card divide-y divide-slate-100">
-        {suite.map((t) => {
-          const r = showing[t.id];
-          const isOpen = open === t.id;
-          return (
-            <div key={t.id}>
-              <button onClick={() => setOpen(isOpen ? null : t.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50">
-                <ChevronRight size={16} className={`shrink-0 text-slate-400 transition ${isOpen ? "rotate-90" : ""}`} />
-                <span className="w-9 shrink-0 font-mono text-xs text-slate-500">{t.id}</span>
-                <span className="min-w-0 flex-1 text-sm">{t.question}</span>
-                <span className="chip hidden bg-slate-100 text-slate-600 sm:inline-flex">{t.category}</span>
-                {running === t.id ? (
-                  <Loader2 size={18} className="animate-spin text-slate-400" />
-                ) : r ? (
-                  r.passed ? <CheckCircle2 size={18} className="text-emerald-600" /> : <XCircle size={18} className="text-rose-600" />
-                ) : (
-                  <span className="h-[18px] w-[18px] rounded-full border border-slate-200" />
+      <dl className="mt-8 flex flex-wrap gap-x-12 gap-y-4 border-y-[3px] border-double border-ink py-4">
+        <Figure value={results.length ? `${passed}/${results.length}` : "–"} label="tests passed" />
+        <Figure value={results.length ? `${Math.round((passed / results.length) * 100)}%` : "–"} label="execution accuracy" />
+        <Figure value={amb.length ? `${amb.filter((r) => r.passed).length}/${amb.length}` : "–"} label="vague questions asked back" />
+      </dl>
+      <p className="mt-3 text-[13px] text-muted">
+        {liveCount
+          ? `Live run in progress or just finished: ${liveCount} of ${suite.length} done.`
+          : saved
+            ? `Showing the run saved on ${new Date(saved.run_at).toLocaleString("en-GB")}. Running the tests again calls the live agent, and results can vary slightly between runs.`
+            : "No saved run yet. Run the tests to see results."}
+      </p>
+
+      <table className="ledger mt-6 w-full text-[14px]">
+        <thead>
+          <tr>
+            <th className="w-14">Test</th>
+            <th>Question</th>
+            <th className="hidden sm:table-cell">What it checks</th>
+            <th className="w-28 text-right">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {suite.map((t) => {
+            const r = showing[t.id];
+            const isOpen = open === t.id;
+            return (
+              <Fragment key={t.id}>
+                <tr className="cursor-pointer" onClick={() => setOpen(isOpen ? null : t.id)}>
+                  <td className="narrow align-top text-[15px] font-bold text-muted">{t.id}</td>
+                  <td className="align-top">
+                    <button className="flex items-start gap-1 text-left" aria-expanded={isOpen}>
+                      <ChevronRight size={15} className={`mt-0.5 shrink-0 text-muted transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                      {t.question}
+                    </button>
+                  </td>
+                  <td className="hidden align-top text-[13px] text-muted sm:table-cell">{t.category}</td>
+                  <td className="py-2 text-right align-top">
+                    {running === t.id ? (
+                      <Loader2 size={16} className="ml-auto animate-spin text-carbon" />
+                    ) : r ? (
+                      <span className={`stamp stamp-sm ${r.passed ? "text-ledger" : "text-stamp"}`}>{r.passed ? "Pass" : "Fail"}</span>
+                    ) : (
+                      <span className="text-[13px] text-muted">Not run</span>
+                    )}
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr>
+                    <td colSpan={4} className="bg-[#FAFAFD] px-3 pb-5 pt-3">
+                      <p className="max-w-3xl text-[13.5px] text-muted">The trap: {t.challenge}</p>
+                      {r && (
+                        <p className={`mt-1 text-[13.5px] ${r.passed ? "text-ledger" : "text-stamp"}`}>
+                          {r.passed ? "Passed" : "Failed"}: {r.reason}
+                          {r.latency_ms ? `, ${(r.latency_ms / 1000).toFixed(1)} s` : ""}
+                        </p>
+                      )}
+                      {r?.agent_answer && r.agent_status !== "success" && <p className="mt-2 max-w-3xl text-[14px] italic">“{r.agent_answer}”</p>}
+                      <div className="mt-4 grid gap-6 lg:grid-cols-2">
+                        {t.reference_sql && (
+                          <div className="min-w-0">
+                            <p className="mb-1.5 text-sm font-semibold">Our hand-written SQL</p>
+                            <SqlInspector sql={t.reference_sql} note={false} />
+                            {r?.expected && (
+                              <div className="mt-3">
+                                <SortableTable columns={r.expected.columns} rows={r.expected.rows} exportable={false} />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {r?.agent_sql && (
+                          <div className="min-w-0">
+                            <p className="mb-1.5 text-sm font-semibold">The agent's SQL</p>
+                            <SqlInspector sql={r.agent_sql} note={false} />
+                            {r.actual?.columns.length > 0 && (
+                              <div className="mt-3">
+                                <SortableTable columns={r.actual.columns} rows={r.actual.rows} exportable={false} />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 )}
-              </button>
-              {isOpen && (
-                <div className="space-y-3 bg-slate-50/60 px-4 pb-4 pl-14 text-sm">
-                  <p className="text-xs text-slate-500">
-                    <b>Trap:</b> {t.challenge} · <b>Check:</b> {t.check}
-                  </p>
-                  {r && (
-                    <p className={`text-xs ${r.passed ? "text-emerald-700" : "text-rose-700"}`}>
-                      <b>{r.passed ? "PASS" : "FAIL"}:</b> {r.reason}
-                      {r.agent_status && ` · agent status: ${r.agent_status}`}
-                      {r.latency_ms ? ` · ${(r.latency_ms / 1000).toFixed(1)}s` : ""}
-                    </p>
-                  )}
-                  {r?.agent_answer && r.agent_status !== "success" && <p className="text-xs italic text-slate-600">“{r.agent_answer}”</p>}
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    {t.reference_sql && (
-                      <div className="min-w-0">
-                        <div className="mb-1 text-xs font-semibold">Reference SQL (hand-written)</div>
-                        <SqlInspector sql={t.reference_sql} />
-                        {r?.expected && <div className="mt-2"><SortableTable columns={r.expected.columns} rows={r.expected.rows} /></div>}
-                      </div>
-                    )}
-                    {r?.agent_sql && (
-                      <div className="min-w-0">
-                        <div className="mb-1 text-xs font-semibold">Agent SQL</div>
-                        <SqlInspector sql={r.agent_sql} />
-                        {r.actual?.columns.length > 0 && <div className="mt-2"><SortableTable columns={r.actual.columns} rows={r.actual.rows} /></div>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Figure({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <div className="text-2xl font-semibold tabular-nums">{value}</div>
-      <div className="text-xs text-slate-500">{label}</div>
+      <dd className="narrow text-[44px] font-extrabold leading-none">{value}</dd>
+      <dt className="mt-1 text-[13px] text-muted">{label}</dt>
     </div>
   );
 }
