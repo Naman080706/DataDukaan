@@ -45,5 +45,25 @@ Key decisions, experiments, AI assistance and rejected approaches.
 **Deployment**
 - One Vercel project serves `web/dist` as static files and `api/index.py` as a Python function. The 16.5 MB DuckDB file is bundled with `includeFiles`.
 
+## 2026-10-22
+
+**Frontend redesign**
+- Restyled the app as a carbon-copy bill book, chosen because the data is invoices and the product is named DataDukaan.
+- Past questions sit in a counterfoil column, each answer is shown as a bill with a rubber stamp for its status, results use ledger tables, and SQL appears as a violet carbon copy.
+- Fonts: Archivo with its width axis (expanded for headlines, condensed for figures). IBM Plex Mono is used only for SQL.
+
+**Not depending on one AI service**
+- Problem: free-tier Gemini returned 429 errors on several models during testing.
+- Considered RAG and rejected it as the fix. Questions about 1M rows need exact aggregation in SQL; retrieving rows for the model to read would make the totals less reliable, and RAG still needs an AI model, so it doesn't help in an outage.
+- Built a chain instead:
+  1. Saved answers: question to verified SQL, always re-run.
+  2. Gemini models.
+  3. Groq models (optional key).
+  4. An offline rule engine: a parser plus SQL templates using the same data rules, with template summaries. It asks back on vague questions, refuses writes, and declines what it can't parse ("last year", "this month") rather than guess.
+- Trap suite now scores each engine separately, and saved answers are bypassed during tests.
+  - Offline engine: 15/15. It was written with the suite in view (stated in the README).
+  - AI agent: 14/15. T09 failed only because every Gemini model hit its quota mid-run.
+- The AI asked back on "Which customers generated the most revenue?" and "returned most last quarter" while the cache was being warmed, even though the rules define both. Added explicit "do not ask back" lines to the ambiguity rules.
+
 ## AI assistance
 Code was written with help from Claude Code (Anthropic). The team reviewed every module and can explain how it works.

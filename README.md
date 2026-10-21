@@ -20,6 +20,16 @@ RetailIQ answers plain-English questions about two years of real transactions (U
 5. **Inspects errors and retries** (at most 2 retries). The LLM gets the database error back and repairs the query.
 6. **Answers only from the returned rows.** The answer shows the SQL, a sortable table, an automatically chosen bar or line chart, CSV export and the full tool-call trace.
 
+### When the AI is unavailable
+
+The free Gemini tier hit its quota during development, so the agent doesn't depend on any single AI service. Each question takes the first source that works:
+
+1. **Saved answers** (`backend/cache.py`). If the exact question was answered before, its verified SQL is reused with no AI call. The SQL is still validated and re-run, so the numbers always come from the database. The app's suggested questions are pre-saved in `data/saved_answers.json` by `scripts/warm_cache.py`.
+2. **AI, with fallbacks** (`backend/llm.py`). Several Gemini models are tried in turn, because free quotas are per model. **Groq** (Llama and GPT-OSS models) comes next if `GROQ_API_KEY` is set.
+3. **Offline rule engine** (`backend/offline.py`). With no AI at all, it parses the question into a measure (net or gross revenue, units, orders, returns, cancellations, customers), a breakdown (product, country, customer, month, quarter, year), a period and a country. It then fills pre-checked SQL templates that follow the same data rules, and writes the answer from the rows with a template. It still asks back on vague questions and refuses writes. If it doesn't understand a question, it says so and suggests a phrasing, rather than guessing.
+
+The answer's stamp shows where it came from: "Answered", "Saved answer" or "Answered offline". For the demo, a toggle in the app forces offline mode.
+
 The **trap-question suite** has 15 team-written questions, each checked against hand-written reference SQL. The app can run it live and shows pass/fail per question.
 
 ## Architecture
@@ -29,7 +39,9 @@ flowchart LR
     U[Store manager] -->|question + recent turns| FE[React + Tailwind UI<br/>workspace · evaluation · data rules]
     FE -->|POST /api/ask| API[FastAPI on Vercel Python function]
     API --> AG[Agent loop<br/>backend/agent.py]
-    AG -->|schema + data rules| LLM[(Gemini API<br/>model fallback chain)]
+    AG -->|1. same question before?| SA[(Saved answers<br/>verified SQL)]
+    AG -->|2. schema + data rules| LLM[(Gemini models →<br/>Groq models)]
+    AG -->|3. all AI down| OFF[Offline rule engine<br/>SQL templates]
     AG -->|clarify / refuse| FE
     AG --> V[validate_sql<br/>sqlglot parser]
     V -->|single SELECT only| DB[(DuckDB file<br/>read_only=True)]
@@ -53,7 +65,7 @@ flowchart LR
 ### Tech stack
 - **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Recharts, lucide-react
 - **Backend:** Python 3.12+, FastAPI, Pydantic, DuckDB 2.0, sqlglot, httpx
-- **LLM:** Google Gemini API (`gemini-3.5-flash` with low thinking for SQL, `gemini-3.5-flash-lite` for summaries, with automatic fallback to other Gemini models on rate limits)
+- **LLM:** Google Gemini API (`gemini-3.5-flash` with low thinking for SQL, `gemini-3.5-flash-lite` for summaries, falling back to other Gemini models on rate limits), then Groq (optional key), then the offline rule engine
 - **Preprocessing:** pandas, openpyxl, pyarrow (run once)
 - **Hosting:** Vercel (static frontend and a Python serverless function)
 - **AI coding tools:** Claude Code (Anthropic) assisted with writing code; see DEV_LOG.md.
@@ -92,16 +104,24 @@ There are 15 questions in [`eval/trap_suite.json`](eval/trap_suite.json):
 - **Ambiguity:** the agent asked a clarifying question.
 - **Safety:** the request was refused or blocked.
 
-**Latest saved run** ([`eval/results.json`](eval/results.json)): **15/15 passed. Execution accuracy 100%. Clarification rate 3/3.**
+The AI agent and the offline engine are scored separately (the Trap tests page has a switch). Saved answers are bypassed during tests, so each run tests the engine itself.
+
+| Engine | Latest saved run | Passed | Asked back on vague questions |
+|---|---|---|---|
+| AI agent, Gemini only ([`eval/results.json`](eval/results.json)) | 2026-10-22 | **14/15 (93%)** | 3/3 |
+| Offline rule engine ([`eval/results_offline.json`](eval/results_offline.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
+
+- **AI agent failure:** the one failure (T09, "What were sales last quarter?") happened because every Gemini model returned a quota error during that run, not because of wrong SQL. In the app, that question would have dropped to the offline engine. Earlier runs passed 15/15. Before the latest run, we added explicit "do not ask back" lines for "returned most" and "most revenue", after the AI asked back on them during cache warming.
+- **Offline engine caveat:** we wrote it with these 15 questions in view, so its 15/15 shows it covers them, not that it handles any wording.
 
 **Limitations (stated honestly):**
 - The team wrote the questions, and the data rules in the prompt match the reference definitions, so this measures rule-following, not open-domain generalisation.
 - LLM output is not deterministic, so a re-run can differ. The **Run suite live** button re-runs every test against the deployed agent.
-- Free-tier Gemini quotas can cause fallbacks to other models or slow responses.
+- Free-tier Gemini quotas can cause fallbacks to other models or slow responses. The offline engine only understands the question patterns it was built for.
 - Only one table is exposed.
 - The data ends in December 2011.
 
-Run it yourself: `python scripts/run_eval.py`
+Run it yourself: `python scripts/run_eval.py` (AI agent) or `python scripts/run_eval.py --offline` (rule engine)
 
 ## Setup and running locally
 
