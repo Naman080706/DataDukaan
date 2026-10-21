@@ -25,7 +25,7 @@ RetailIQ answers plain-English questions about two years of real transactions (U
 The free Gemini tier hit its quota during development, so the agent doesn't depend on any single AI service. Each question takes the first source that works:
 
 1. **Saved answers** (`backend/cache.py`). If the exact question was answered before, its verified SQL is reused with no AI call. The SQL is still validated and re-run, so the numbers always come from the database. The app's suggested questions are pre-saved in `data/saved_answers.json` by `scripts/warm_cache.py`.
-2. **AI, with fallbacks** (`backend/llm.py`). Several Gemini models are tried in turn, because free quotas are per model. **Groq** (Llama and GPT-OSS models) comes next if `GROQ_API_KEY` is set.
+2. **AI, with fallbacks** (`backend/llm.py`). Several Gemini models are tried in turn, because free quotas are per model. **Groq** (`gpt-oss-120b`, `qwen3.8-27b`, `gpt-oss-20b`) comes next if `GROQ_API_KEY` is set.
 3. **Offline rule engine** (`backend/offline.py`). With no AI at all, it parses the question into a measure (net or gross revenue, units, orders, returns, cancellations, customers), a breakdown (product, country, customer, month, quarter, year), a period and a country. It then fills pre-checked SQL templates that follow the same data rules, and writes the answer from the rows with a template. It still asks back on vague questions and refuses writes. If it doesn't understand a question, it says so and suggests a phrasing, rather than guessing.
 
 The answer's stamp shows where it came from: "Answered", "Saved answer" or "Answered offline". For the demo, a toggle in the app forces offline mode.
@@ -109,9 +109,11 @@ The AI agent and the offline engine are scored separately (the Trap tests page h
 | Engine | Latest saved run | Passed | Asked back on vague questions |
 |---|---|---|---|
 | AI agent, Gemini only ([`eval/results.json`](eval/results.json)) | 2026-10-22 | **14/15 (93%)** | 3/3 |
+| AI agent, Groq only, Gemini disabled ([`eval/results_groq.json`](eval/results_groq.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
 | Offline rule engine ([`eval/results_offline.json`](eval/results_offline.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
 
 - **AI agent failure:** the one failure (T09, "What were sales last quarter?") happened because every Gemini model returned a quota error during that run, not because of wrong SQL. In the app, that question would have dropped to the offline engine. Earlier runs passed 15/15. Before the latest run, we added explicit "do not ask back" lines for "returned most" and "most revenue", after the AI asked back on them during cache warming.
+- **Groq run:** Groq's own rate limits moved the run across `gpt-oss-120b`, `qwen3.8-27b` and `gpt-oss-20b` (each test records which model answered), so the 15/15 covers that mix of models.
 - **Offline engine caveat:** we wrote it with these 15 questions in view, so its 15/15 shows it covers them, not that it handles any wording.
 
 **Limitations (stated honestly):**

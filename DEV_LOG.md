@@ -65,5 +65,10 @@ Key decisions, experiments, AI assistance and rejected approaches.
   - AI agent: 14/15. T09 failed only because every Gemini model hit its quota mid-run.
 - The AI asked back on "Which customers generated the most revenue?" and "returned most last quarter" while the cache was being warmed, even though the rules define both. Added explicit "do not ask back" lines to the ambiguity rules.
 
+**Groq tested**
+- The Llama models in the original default list are no longer offered on Groq. Switched the defaults to `openai/gpt-oss-120b`, `qwen/qwen3.8-27b` and `openai/gpt-oss-20b`, based on the key's model list.
+- With Gemini disabled, Groq wrote correct SQL, asked back on "best customers" and fixed the deliberately broken SQL on its second attempt.
+- Trap suite with Groq only: 15/15. Groq's rate limits moved the run across all three models, which shows the in-provider fallback working (`eval/results_groq.json`).
+
 ## AI assistance
 Code was written with help from Claude Code (Anthropic). The team reviewed every module and can explain how it works.

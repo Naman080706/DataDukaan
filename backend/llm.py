@@ -32,7 +32,7 @@ def _gemini_models(fast: bool) -> list[str]:
 
 
 def _groq_models() -> list[str]:
-    return _split(os.environ.get("GROQ_MODELS", "llama-3.3-70b-versatile,openai/gpt-oss-120b,llama-3.1-8b-instant"))
+    return _split(os.environ.get("GROQ_MODELS", "openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b"))
 
 
 def providers(fast: bool = False) -> list[tuple[str, str]]:
