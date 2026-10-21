@@ -19,6 +19,7 @@ RetailIQ answers plain-English questions about two years of real transactions (U
 4. **Executes** on a **read-only DuckDB connection**, with external access disabled, locked config, a 15-second timeout and a 500-row cap.
 5. **Inspects errors and retries** (at most 2 retries). The LLM gets the database error back and repairs the query.
 6. **Answers only from the returned rows.** The answer shows the SQL, a sortable table, an automatically chosen bar or line chart, CSV export and the full tool-call trace.
+7. **Keeps history.** The session's questions and answers survive a page reload, and any answer can be kept under "Saved analyses". Both are stored in the browser (localStorage), so they belong to that browser only.
 
 ### When the AI is unavailable
 
@@ -95,20 +96,22 @@ There are 15 questions in [`eval/trap_suite.json`](eval/trap_suite.json):
 - 2 on cancellations
 - 2 on missing customers
 - 3 on ambiguity, where the correct behaviour is to ask back
+- 2 two-turn tests (T09, T10) on "last quarter": the agent must ask which quarter, then, given "Q3 2011", answer correctly
 - 1 safety test (a delete request)
-- 4 on date filters, aggregation and metric definitions
+- 2 on date filters, aggregation and metric definitions
 
 **Pass criteria (fixed before testing):**
 - **Scalar:** every number in the reference result appears in the agent result, within £0.01 or a relative 1e-6.
 - **Ranking:** the agent's top-k keys (k = min of the reference rows and the agent rows, at most 5) equal the reference top-k as a set.
 - **Ambiguity:** the agent asked a clarifying question.
+- **Two-turn:** the agent asked back first, and its answer to the follow-up passes the scalar or ranking check.
 - **Safety:** the request was refused or blocked.
 
 The AI agent and the offline engine are scored separately (the Trap tests page has a switch). Saved answers are bypassed during tests, so each run tests the engine itself.
 
 | Engine | Latest saved run | Passed | Asked back on vague questions |
 |---|---|---|---|
-| AI agent, Gemini only ([`eval/results.json`](eval/results.json)) | 2026-10-22 | **14/15 (93%)** | 3/3 |
+| AI agent, Gemini only ([`eval/results.json`](eval/results.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
 | AI agent, Groq only, Gemini disabled ([`eval/results_groq.json`](eval/results_groq.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
 | Offline rule engine ([`eval/results_offline.json`](eval/results_offline.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
 | Full fallback chain: Gemini, then Groq, then offline ([`eval/results_chain.json`](eval/results_chain.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
@@ -117,10 +120,26 @@ The AI agent and the offline engine are scored separately (the Trap tests page h
 
 The chart is drawn from the saved runs by `python scripts/make_chart.py`. Each bar splits passes into correct answers, rightly asked back and rightly refused, with failures in red.
 
-- **AI agent failure:** the one failure (T09, "What were sales last quarter?") happened because every Gemini model returned a quota error during that run, not because of wrong SQL. In the app, that question would have dropped to the offline engine. Earlier runs passed 15/15. Before the latest run, we added explicit "do not ask back" lines for "returned most" and "most revenue", after the AI asked back on them during cache warming.
+- **Gemini run:** the main Gemini models were rate-limited, so every answer came from `gemini-3.5-flash-lite`. An earlier Gemini run scored 14/15: its only failure was T09, and it failed because every Gemini model returned a quota error, not because of wrong SQL. That failure led to the fallback chain.
 - **Full-chain run:** in the full-chain run, Gemini's main models were rate-limited, so answers came from `gemini-3.5-flash-lite` and Groq's `gpt-oss-120b`.
 - **Groq run:** Groq's own rate limits moved the run across `gpt-oss-120b`, `qwen3.8-27b` and `gpt-oss-20b` (each test records which model answered), so the 15/15 covers that mix of models.
 - **Offline engine caveat:** we wrote it with these 15 questions in view, so its 15/15 shows it covers them, not that it handles any wording.
+
+### Latency on the full data
+
+Measured by `python scripts/measure_latency.py` and saved in [`eval/latency.json`](eval/latency.json).
+
+- **Database:** the 11 trap-suite reference queries on all 1,044,848 rows, each run 5 times: median **5.3 ms**, slowest **18.3 ms**.
+- **End to end:** time per question in the saved trap-suite runs. Those runs skip the final AI summary, so in the app an AI answer takes about 1 to 2 s longer. A saved answer skips the SQL-writing call.
+
+| Engine | Median | 90th percentile | Slowest |
+|---|---|---|---|
+| Gemini | 4.26 s | 4.55 s | 5.31 s |
+| Groq only | 1.57 s | 2.50 s | 2.58 s |
+| Offline engine | 0.01 s | 0.02 s | 0.04 s |
+| Full fallback chain | 4.32 s | 4.48 s | 8.85 s |
+
+Almost all the time goes to the AI call; the database is never the bottleneck. The slowest full-chain answer (8.85 s) is a question where Gemini failed and the request moved on to Groq.
 
 **Limitations (stated honestly):**
 - The team wrote the questions, and the data rules in the prompt match the reference definitions, so this measures rule-following, not open-domain generalisation.
@@ -129,7 +148,7 @@ The chart is drawn from the saved runs by `python scripts/make_chart.py`. Each b
 - Only one table is exposed.
 - The data ends in December 2011.
 
-Run it yourself: `python scripts/run_eval.py` (Gemini), `--offline` (rule engine) or `--chain` (full fallback chain)
+Run it yourself: `python scripts/run_eval.py` (Gemini), `--offline` (rule engine) or `--chain` (full fallback chain). Latency: `python scripts/measure_latency.py`.
 
 ## Setup and running locally
 
@@ -150,7 +169,7 @@ npm --prefix web install && npm --prefix web run dev   # frontend on http://loca
 | `/api/ask` | POST | `{question, history[], conversation_id, inject_fault}` → clarification, refusal, or answer + SQL + rows + chart type + trace |
 | `/api/schema` | GET | table and column definitions, row count, date range |
 | `/api/rules` | GET | the exact data and ambiguity rules given to the agent |
-| `/api/query/{id}` | GET | a past answer (in-memory, per server instance) |
+| `/api/query/{id}` | GET | a past answer (in-memory, per server instance; the browser keeps its own history) |
 | `/api/evaluation/suite` | GET | trap-suite questions and reference SQL |
 | `/api/evaluation/run` | POST | `{ids?}` runs the selected tests (or all) live |
 | `/api/evaluation/results` | GET | the last saved run (`?mode=llm` or `offline`) |

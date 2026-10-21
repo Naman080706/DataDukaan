@@ -20,6 +20,7 @@ from backend.evaluation import compare_engines  # noqa: E402
 OUT = os.path.join(ROOT, "docs", "engine_comparison.png")
 SEGMENTS = [
     ("answered", "Correct answer", "#2F7A55"),
+    ("asked_then_answered", "Asked back, then answered", "#7FB89A"),
     ("asked_back", "Rightly asked back", "#4338A8"),
     ("refused", "Rightly refused", "#8A879C"),
     ("failed", "Failed", "#B8322A"),
@@ -62,7 +63,7 @@ def main() -> None:
     fig.text(0.02, 0.955, "Which engine gets the trap questions right", ha="left", va="top", fontsize=17, fontweight="bold", color=INK)
     fig.text(0.02, 0.885, f"DataDukaan (RetailIQ): the same {total} trap questions, scored against hand-written SQL. Runs saved {run_date}.",
              ha="left", va="top", fontsize=10, color=MUTED)
-    ax.legend(loc="upper center", bbox_to_anchor=(0.45, -0.14), ncol=4, frameon=False, fontsize=10, labelcolor=INK)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.45, -0.14), ncol=5, frameon=False, fontsize=9.5, columnspacing=1.4, labelcolor=INK)
 
     notes = []
     for s in scores[::-1]:

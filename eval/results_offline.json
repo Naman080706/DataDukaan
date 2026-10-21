@@ -1,6 +1,6 @@
 {
   "mode": "offline",
-  "run_at": "2026-10-21T19:41:20+00:00",
+  "run_at": "2026-10-21T20:53:41+00:00",
   "total": 15,
   "passed": 15,
   "execution_accuracy": 1.0,
@@ -14,6 +14,8 @@
       "challenge": "Calendar-year filter; net = sales minus cancellations/returns.",
       "passed": true,
       "reason": "matched [9009870.97]",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
       "expected": {
         "columns": [
@@ -39,7 +41,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 34,
+      "latency_ms": 36,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -51,6 +53,8 @@
       "challenge": "Count only sale lines; returns and stock adjustments must not offset or inflate.",
       "passed": true,
       "reason": "top 5 match: ['84077', '85099B', '21212', '85123A', '22197']",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT stock_code, any_value(description) AS description, SUM(quantity) AS units_sold FROM transactions WHERE line_type = 'sale' AND is_product GROUP BY stock_code ORDER BY units_sold DESC LIMIT 5",
       "expected": {
         "columns": [
@@ -149,7 +153,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 13,
+      "latency_ms": 14,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -161,6 +165,8 @@
       "challenge": "Returns are 'C' invoices with negative quantity; frequency = number of return invoices.",
       "passed": true,
       "reason": "top 5 match: ['22423', '22138', '21232', '21843', '85123A']",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT stock_code, any_value(description) AS description, COUNT(DISTINCT invoice) AS return_invoices FROM transactions WHERE line_type = 'cancellation' AND is_product GROUP BY stock_code ORDER BY return_invoices DESC LIMIT 5",
       "expected": {
         "columns": [
@@ -238,7 +244,7 @@
           ],
           [
             "21527",
-            "RETRO SPOT TRADITIONAL TEAPOT",
+            "RED RETROSPOT TRADITIONAL TEAPOT",
             114
           ],
           [
@@ -259,7 +265,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 19,
+      "latency_ms": 21,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -271,6 +277,8 @@
       "challenge": "Invoice numbers starting with 'C'; count distinct invoices, not lines.",
       "passed": true,
       "reason": "matched [8292]",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT COUNT(DISTINCT invoice) AS cancelled_invoices FROM transactions WHERE is_cancelled",
       "expected": {
         "columns": [
@@ -308,6 +316,8 @@
       "challenge": "Gross sales only; cancelled invoices and non-sale lines removed.",
       "passed": true,
       "reason": "matched [20522679.84]",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale'",
       "expected": {
         "columns": [
@@ -345,6 +355,8 @@
       "challenge": "Net revenue per country; keeps lines with unknown customers.",
       "passed": true,
       "reason": "top 1 match: ['United Kingdom']",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 1",
       "expected": {
         "columns": [
@@ -410,7 +422,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 10,
+      "latency_ms": 11,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -422,6 +434,8 @@
       "challenge": "NULL customer_id would otherwise rank as the biggest 'customer'.",
       "passed": true,
       "reason": "top 5 match: ['18102', '14646', '14156', '14911', '17450']",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT customer_id, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND customer_id IS NOT NULL GROUP BY customer_id ORDER BY net_revenue_gbp DESC LIMIT 5",
       "expected": {
         "columns": [
@@ -503,7 +517,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 10,
+      "latency_ms": 11,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -515,6 +529,8 @@
       "challenge": "'Best' is undefined: revenue, order count or units must be chosen by the user.",
       "passed": true,
       "reason": "asked a clarifying question",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": null,
       "expected": null,
       "agent_status": "clarification",
@@ -533,10 +549,19 @@
       "id": "T09",
       "question": "What were sales last quarter?",
       "category": "date filter",
-      "check": "scalar",
-      "challenge": "'Last quarter' is anchored to the end of the data (Q3 2011), not today's date.",
+      "check": "clarify_then_scalar",
+      "challenge": "'Last quarter' is unclear because the data ends on 9 Dec 2011 (Q3 complete, Q4 partial): ask which quarter, then answer for the one picked.",
       "passed": true,
-      "reason": "matched [2394730.3]",
+      "reason": "asked back, then after 'Q3 2011 (Jul to Sep, the last complete quarter)': matched [2394730.3]",
+      "followup": "Q3 2011 (Jul to Sep, the last complete quarter)",
+      "first_turn": {
+        "status": "clarification",
+        "answer": "Which quarter do you mean? The data ends on 9 December 2011.",
+        "options": [
+          "Q3 2011 (Jul to Sep, the last complete quarter)",
+          "Q4 2011 so far (1 Oct to 9 Dec)"
+        ]
+      },
       "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01'",
       "expected": {
         "columns": [
@@ -562,7 +587,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4,
+      "latency_ms": 5,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -570,10 +595,19 @@
       "id": "T10",
       "question": "Which products were returned most last quarter?",
       "category": "returns",
-      "check": "top_k",
-      "challenge": "Returns by units within Q3 2011.",
+      "check": "clarify_then_top_k",
+      "challenge": "Ask which quarter 'last quarter' means, then rank returns by units within it.",
       "passed": true,
-      "reason": "top 5 match: ['23113', '21877', '71477', '21069', '21871']",
+      "reason": "asked back, then after 'Q3 2011 (Jul to Sep, the last complete quarter)': top 5 match: ['23113', '21877', '71477', '21069', '21871']",
+      "followup": "Q3 2011 (Jul to Sep, the last complete quarter)",
+      "first_turn": {
+        "status": "clarification",
+        "answer": "Which quarter do you mean? The data ends on 9 December 2011.",
+        "options": [
+          "Q3 2011 (Jul to Sep, the last complete quarter)",
+          "Q4 2011 so far (1 Oct to 9 Dec)"
+        ]
+      },
       "reference_sql": "SELECT stock_code, any_value(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 5",
       "expected": {
         "columns": [
@@ -672,7 +706,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 8,
+      "latency_ms": 7,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -684,6 +718,8 @@
       "challenge": "Two different definitions: all rows vs sales minus returns.",
       "passed": true,
       "reason": "matched [18909762.1, 19057376.18]",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS total_transaction_value_gbp, ROUND(SUM(line_value) FILTER (WHERE line_type IN ('sale', 'cancellation')), 2) AS net_sales_value_gbp FROM transactions",
       "expected": {
         "columns": [
@@ -713,7 +749,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 5,
+      "latency_ms": 3,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -725,6 +761,8 @@
       "challenge": "Top by revenue or by quantity is not stated.",
       "passed": true,
       "reason": "asked a clarifying question",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": null,
       "expected": null,
       "agent_status": "clarification",
@@ -747,6 +785,8 @@
       "challenge": "Unknown (NULL) customers must not be counted as a customer.",
       "passed": true,
       "reason": "matched [4219]",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": "SELECT COUNT(DISTINCT customer_id) AS customers FROM transactions WHERE line_type = 'sale' AND customer_id IS NOT NULL AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
       "expected": {
         "columns": [
@@ -772,7 +812,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 6,
+      "latency_ms": 7,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -784,6 +824,8 @@
       "challenge": "No metric or period given.",
       "passed": true,
       "reason": "asked a clarifying question",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": null,
       "expected": null,
       "agent_status": "clarification",
@@ -806,6 +848,8 @@
       "challenge": "Write request must be refused; no SQL may modify data.",
       "passed": true,
       "reason": "request refused, no data modified",
+      "followup": null,
+      "first_turn": null,
       "reference_sql": null,
       "expected": null,
       "agent_status": "refused",
