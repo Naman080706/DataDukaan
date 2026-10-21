@@ -2,6 +2,7 @@
 
 Run: python scripts/run_eval.py [--offline] [T01 T02 ...]
 --offline scores the rule engine alone (no AI) and saves eval/results_offline.json.
+--chain scores the full fallback chain (Gemini, then Groq, then offline) and saves eval/results_chain.json.
 """
 import json
 import os
@@ -18,7 +19,7 @@ from backend.evaluation import results_path, run_suite  # noqa: E402
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    mode = "offline" if "--offline" in args else "llm"
+    mode = "offline" if "--offline" in args else "chain" if "--chain" in args else "llm"
     ids = [a for a in args if not a.startswith("--")]
     summary = run_suite(ids or None, mode)
     for r in summary["results"]:

@@ -11,9 +11,37 @@ SUITE_PATH = os.path.join(ROOT, "eval", "trap_suite.json")
 RESULTS_PATH = os.path.join(ROOT, "eval", "results.json")
 OFFLINE_RESULTS_PATH = os.path.join(ROOT, "eval", "results_offline.json")
 
+# Engines compared on the Trap tests page. "groq" is recorded with Gemini disabled (no live mode).
+ENGINES = {
+    "llm": ("Gemini", "results.json"),
+    "groq": ("Groq only", "results_groq.json"),
+    "offline": ("Offline engine", "results_offline.json"),
+    "chain": ("Full fallback chain", "results_chain.json"),
+}
+
 
 def results_path(mode: str) -> str:
-    return OFFLINE_RESULTS_PATH if mode == "offline" else RESULTS_PATH
+    return os.path.join(ROOT, "eval", ENGINES.get(mode, ENGINES["llm"])[1])
+
+
+def compare_engines() -> list[dict]:
+    """Per-engine pass counts split by what a pass means: correct answer, asked back, refused."""
+    out = []
+    for mode, (label, _) in ENGINES.items():
+        run = load_results(mode)
+        if not run:
+            continue
+        res = run["results"]
+        ok = lambda check: sum(r["passed"] and r["check"] == check for r in res)  # noqa: E731
+        out.append({
+            "mode": mode, "label": label, "run_at": run["run_at"], "total": len(res),
+            "passed": sum(r["passed"] for r in res),
+            "answered": ok("scalar") + ok("top_k"), "asked_back": ok("clarify"), "refused": ok("blocked"),
+            "failed": sum(not r["passed"] for r in res),
+            "failures": [{"id": r["id"], "reason": r["reason"]} for r in res if not r["passed"]],
+            "models": sorted({r.get("model") for r in res if r.get("model")}),
+        })
+    return out
 
 # Tolerance: money/counts must match to the penny (0.01) or 1e-6 relative.
 ABS_TOL = 0.01
@@ -71,7 +99,8 @@ def compare(test: dict, expected: dict | None, actual: dict) -> tuple[bool, str]
 def run_test(test: dict, mode: str = "llm") -> dict:
     expected = db.execute_readonly_sql(test["reference_sql"]) if test.get("reference_sql") else None
     # Saved answers are bypassed so the suite always tests the engine itself.
-    actual = ask(test["question"], summarize=False, mode=mode, use_cache=False)
+    # "chain" is the app's real path (Gemini, then Groq, then offline) minus saved answers.
+    actual = ask(test["question"], summarize=False, mode="auto" if mode == "chain" else mode, use_cache=False)
     passed, reason = compare(test, expected, actual)
     return {
         "id": test["id"], "question": test["question"], "category": test["category"], "check": test["check"],

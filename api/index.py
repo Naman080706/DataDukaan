@@ -101,6 +101,11 @@ def run_eval(req: EvalRequest):
     return evaluation.run_suite(req.ids, req.mode)
 
 
+@app.get("/api/evaluation/compare")
+def eval_compare():
+    return evaluation.compare_engines()
+
+
 @app.get("/api/evaluation/results")
 def eval_results(mode: Literal["llm", "offline"] = "llm"):
     res = evaluation.load_results(mode)
