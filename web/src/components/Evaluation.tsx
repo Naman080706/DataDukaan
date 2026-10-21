@@ -2,7 +2,6 @@ import { Fragment, useEffect, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { api, EvalMode, EvalRun, TestCase, TestResult } from "../api";
 import { SortableTable, SqlInspector } from "./ResultView";
-import EngineComparison from "./EngineComparison";
 
 export default function Evaluation() {
   const [suite, setSuite] = useState<TestCase[]>([]);
@@ -54,7 +53,6 @@ export default function Evaluation() {
 
   return (
     <div className="space-y-6">
-      <EngineComparison />
       <div className="sheet px-5 py-7 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">

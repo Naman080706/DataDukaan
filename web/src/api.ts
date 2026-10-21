@@ -58,19 +58,6 @@ export interface TestResult extends TestCase {
 
 export type EvalMode = "llm" | "offline";
 
-export interface EngineScore {
-  mode: string;
-  label: string;
-  run_at: string;
-  total: number;
-  passed: number;
-  answered: number;
-  asked_back: number;
-  refused: number;
-  failed: number;
-  failures: { id: string; reason: string }[];
-  models: string[];
-}
 
 export interface EvalRun {
   mode?: EvalMode;
@@ -100,7 +87,6 @@ export const api = {
     req<AskResponse>("/api/ask", { question, history, conversation_id, inject_fault, mode }),
   suite: () => req<TestCase[]>("/api/evaluation/suite"),
   runTests: (ids: string[], mode: EvalMode) => req<EvalRun>("/api/evaluation/run", { ids, mode }),
-  compare: () => req<EngineScore[]>("/api/evaluation/compare"),
   savedResults: (mode: EvalMode) => req<EvalRun>(`/api/evaluation/results?mode=${mode}`),
 };
 

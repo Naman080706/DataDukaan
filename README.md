@@ -113,8 +113,12 @@ The AI agent and the offline engine are scored separately (the Trap tests page h
 | Offline rule engine ([`eval/results_offline.json`](eval/results_offline.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
 | Full fallback chain: Gemini, then Groq, then offline ([`eval/results_chain.json`](eval/results_chain.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
 
+![Trap-suite results by engine](docs/engine_comparison.png)
+
+The chart is drawn from the saved runs by `python scripts/make_chart.py`. Each bar splits passes into correct answers, rightly asked back and rightly refused, with failures in red.
+
 - **AI agent failure:** the one failure (T09, "What were sales last quarter?") happened because every Gemini model returned a quota error during that run, not because of wrong SQL. In the app, that question would have dropped to the offline engine. Earlier runs passed 15/15. Before the latest run, we added explicit "do not ask back" lines for "returned most" and "most revenue", after the AI asked back on them during cache warming.
-- **Comparison chart:** the Trap tests page shows a chart comparing all four engines, with each bar split into correct answers, rightly asked back, rightly refused and failed (from `/api/evaluation/compare`). In the full-chain run, Gemini's main models were rate-limited, so answers came from `gemini-3.5-flash-lite` and Groq's `gpt-oss-120b`.
+- **Full-chain run:** in the full-chain run, Gemini's main models were rate-limited, so answers came from `gemini-3.5-flash-lite` and Groq's `gpt-oss-120b`.
 - **Groq run:** Groq's own rate limits moved the run across `gpt-oss-120b`, `qwen3.8-27b` and `gpt-oss-20b` (each test records which model answered), so the 15/15 covers that mix of models.
 - **Offline engine caveat:** we wrote it with these 15 questions in view, so its 15/15 shows it covers them, not that it handles any wording.
 
@@ -150,7 +154,6 @@ npm --prefix web install && npm --prefix web run dev   # frontend on http://loca
 | `/api/evaluation/suite` | GET | trap-suite questions and reference SQL |
 | `/api/evaluation/run` | POST | `{ids?}` runs the selected tests (or all) live |
 | `/api/evaluation/results` | GET | the last saved run (`?mode=llm` or `offline`) |
-| `/api/evaluation/compare` | GET | pass counts for every engine, for the comparison chart |
 | `/api/health` | GET | database and LLM-key readiness |
 
 ### Deployment (Vercel)
