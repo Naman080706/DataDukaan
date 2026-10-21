@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { api, AskResponse, Turn } from "../api";
 import ResultView from "./ResultView";
+import { loadSaved, loadSession, SavedAnalysis, saveSession, storeSaved } from "../storage";
 
 const SUGGESTED = [
   "What were the top 5 products by revenue?",
@@ -35,18 +36,41 @@ export function stampFor(e: Entry): StampKind | null {
 }
 
 export default function Workspace() {
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [restored] = useState(loadSession);
+  const [entries, setEntries] = useState<Entry[]>(() => restored?.entries ?? []);
+  const [selected, setSelected] = useState<number | null>(() => (restored?.entries.length ? restored.entries.length - 1 : null));
+  const [saved, setSaved] = useState<SavedAnalysis[]>(loadSaved);
+  const [viewSaved, setViewSaved] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [injectFault, setInjectFault] = useState(false);
   const [simulateOutage, setSimulateOutage] = useState(false);
-  const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
+  const [conversationId, setConversationId] = useState(() => restored?.conversationId ?? crypto.randomUUID());
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, [selected]);
+
+  // Keep this session's questions and answers across page reloads (this browser only).
+  useEffect(() => {
+    saveSession(conversationId, entries);
+  }, [conversationId, entries]);
+
+  function toggleSave(entry: Entry) {
+    if (!entry.response) return;
+    const existing = saved.find((s) => s.response.id === entry.response!.id);
+    const next = existing
+      ? saved.filter((s) => s !== existing)
+      : [
+          // A follow-up like "Q3 2011 (...)" means little on its own, so label it with the answer's title.
+          { id: entry.response.id, savedAt: new Date().toISOString(), question: entry.response.title || entry.question, response: entry.response },
+          ...saved,
+        ];
+    setSaved(next);
+    storeSaved(next);
+    if (existing && viewSaved === existing.id) setViewSaved(null);
+  }
 
   const history = (): Turn[] =>
     entries.flatMap((e) => [
@@ -62,6 +86,7 @@ export default function Workspace() {
     const idx = entries.length;
     setEntries((prev) => [...prev, { question }]);
     setSelected(idx);
+    setViewSaved(null);
     try {
       const response = await api.ask(question, history(), conversationId, injectFault, simulateOutage ? "offline" : "auto");
       setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, response } : e)));
@@ -75,10 +100,13 @@ export default function Workspace() {
   function startOver() {
     setEntries([]);
     setSelected(null);
+    setViewSaved(null);
     setConversationId(crypto.randomUUID());
   }
 
-  const current = selected !== null ? entries[selected] : null;
+  const savedView = viewSaved ? saved.find((s) => s.id === viewSaved) : undefined;
+  const current: Entry | null = savedView ? { question: savedView.question, response: savedView.response } : selected !== null ? entries[selected] : null;
+  const isSaved = (e: Entry | null) => !!e?.response && saved.some((s) => s.response.id === e.response!.id);
 
   return (
     <div className="space-y-4">
@@ -94,7 +122,9 @@ export default function Workspace() {
             )}
           </div>
           {entries.length === 0 ? (
-            <p className="px-4 pb-4 text-[13px] leading-relaxed text-muted">Each question you ask is kept here as a stub, so you can go back to it.</p>
+            <p className="px-4 pb-4 text-[13px] leading-relaxed text-muted">
+              Each question you ask is kept here as a stub, so you can go back to it. They stay after a reload, in this browser only.
+            </p>
           ) : (
             <ol className="flex gap-0 overflow-x-auto md:block md:max-h-[640px] md:overflow-y-auto">
               {entries.map((e, i) => {
@@ -102,9 +132,12 @@ export default function Workspace() {
                 return (
                   <li key={i} className="min-w-[200px] md:min-w-0">
                     <button
-                      onClick={() => setSelected(i)}
+                      onClick={() => {
+                        setSelected(i);
+                        setViewSaved(null);
+                      }}
                       className={`block w-full border-l-[3px] px-4 py-3 text-left transition-colors ${
-                        selected === i ? "border-carbon bg-carbon-wash/70" : "border-transparent hover:bg-carbon-wash/40"
+                        !viewSaved && selected === i ? "border-carbon bg-carbon-wash/70" : "border-transparent hover:bg-carbon-wash/40"
                       }`}
                     >
                       <span className="narrow text-[15px] font-bold text-muted">No. {String(i + 1).padStart(3, "0")}</span>
@@ -116,6 +149,27 @@ export default function Workspace() {
               })}
             </ol>
           )}
+
+          {saved.length > 0 && (
+            <div className="border-t border-rule">
+              <p className="px-4 pb-1 pt-4 text-sm font-semibold">Saved analyses</p>
+              <ul className="flex overflow-x-auto md:block md:max-h-[320px] md:overflow-y-auto">
+                {saved.map((s) => (
+                  <li key={s.id} className="min-w-[200px] md:min-w-0">
+                    <button
+                      onClick={() => setViewSaved(s.id)}
+                      className={`block w-full border-l-[3px] px-4 py-2.5 text-left transition-colors ${
+                        viewSaved === s.id ? "border-ledger bg-carbon-wash/70" : "border-transparent hover:bg-carbon-wash/40"
+                      }`}
+                    >
+                      <span className="line-clamp-2 block text-[13.5px] leading-snug">{s.question}</span>
+                      <span className="mt-0.5 block text-xs text-muted">Saved {new Date(s.savedAt).toLocaleDateString("en-GB")}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </aside>
 
         <div className="perforation hidden bg-sheet md:block" aria-hidden />
@@ -124,7 +178,16 @@ export default function Workspace() {
         {/* The bill: the current answer. */}
         <section className="min-w-0 px-5 py-6 sm:px-8">
           {!current && <EmptyBill onAsk={submit} />}
-          {current && <Bill entry={current} onOption={submit} busy={busy} isLatest={selected === entries.length - 1} />}
+          {current && (
+            <Bill
+              entry={current}
+              onOption={submit}
+              busy={busy}
+              isLatest={!savedView && selected === entries.length - 1}
+              saved={isSaved(current)}
+              onToggleSave={() => toggleSave(current)}
+            />
+          )}
         </section>
       </div>
 
@@ -196,7 +259,21 @@ function EmptyBill({ onAsk }: { onAsk: (q: string) => void }) {
   );
 }
 
-function Bill({ entry, onOption, busy, isLatest }: { entry: Entry; onOption: (q: string) => void; busy: boolean; isLatest: boolean }) {
+function Bill({
+  entry,
+  onOption,
+  busy,
+  isLatest,
+  saved,
+  onToggleSave,
+}: {
+  entry: Entry;
+  onOption: (q: string) => void;
+  busy: boolean;
+  isLatest: boolean;
+  saved: boolean;
+  onToggleSave: () => void;
+}) {
   const r = entry.response;
   const s = stampFor(entry);
   return (
@@ -235,7 +312,14 @@ function Bill({ entry, onOption, busy, isLatest }: { entry: Entry; onOption: (q:
 
           {(r.status === "refused" || r.status === "blocked") && r.sql && <pre className="carbon-copy mt-5">{r.sql}</pre>}
 
-          {r.status === "success" && <ResultView r={r} />}
+          {r.status === "success" && (
+            <>
+              <button onClick={onToggleSave} className="mt-4 text-[13px] font-medium text-carbon underline-offset-2 hover:underline">
+                {saved ? "Remove from saved analyses" : "Save this analysis"}
+              </button>
+              <ResultView r={r} />
+            </>
+          )}
         </>
       )}
     </article>

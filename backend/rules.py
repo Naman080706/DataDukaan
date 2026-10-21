@@ -14,6 +14,9 @@ NON_PRODUCT_CODES_SQL = ", ".join(f"'{c}'" for c in NON_PRODUCT_CODES)
 DATASET_START = "2009-12-01"
 DATASET_END = "2011-12-09"
 LAST_FULL_QUARTER = ("2011-07-01", "2011-10-01")  # Q3 2011, the last complete quarter in the data
+# The data ends mid-quarter (9 Dec 2011), so "last quarter" could mean either of these; the agent asks.
+QUARTER_OPTIONS = ["Q3 2011 (Jul to Sep, the last complete quarter)", "Q4 2011 so far (1 Oct to 9 Dec)"]
+MONTH_OPTIONS = ["November 2011 (the last complete month)", "December 2011 so far (1 to 9 Dec)"]
 
 SCHEMA_DOC = """
 Table: transactions  (one row per invoice line, UCI Online Retail II, Dec 2009 - Dec 2011)
@@ -53,20 +56,26 @@ DATA RULES (apply to every query unless the user explicitly asks otherwise):
 10. Money is GBP (pounds sterling). Round money to 2 decimals.
 11. Dates: data covers {DATASET_START} to {DATASET_END}. Years are calendar years
     (e.g. 2011 = invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'). Use half-open ranges.
-    "Last quarter" / "last month" are relative to the end of the data, NOT today: last quarter = last complete
-    calendar quarter = Q3 2011 (invoice_date >= '{LAST_FULL_QUARTER[0]}' AND invoice_date < '{LAST_FULL_QUARTER[1]}').
-    State this assumption.
+    Relative periods ("last quarter", "last month") are relative to the end of the data (9 Dec 2011), NOT today,
+    and are ambiguous because the data stops part-way through Q4 2011: ask which one is meant (see below).
+    Q3 2011 = invoice_date >= '{LAST_FULL_QUARTER[0]}' AND invoice_date < '{LAST_FULL_QUARTER[1]}';
+    Q4 2011 so far = invoice_date >= '2011-10-01' AND invoice_date < '2012-01-01'.
+    November 2011 = '2011-11-01' to '2011-12-01'; December 2011 so far = '2011-12-01' to '2012-01-01'.
 12. Always add a LIMIT (<= 200) for row-level or ranking results.
 """.strip()
 
-AMBIGUITY_RULES = """
+AMBIGUITY_RULES = f"""
 ASK A CLARIFYING QUESTION (do not write SQL) when the metric that decides the answer is not stated, for example:
 - "best/top/biggest customers" without saying by revenue, number of orders or units.
 - "top/best products" without saying by revenue or by quantity sold.
 - "how are we doing", "performance" or other vague requests with no metric.
 - a country/product/customer name that does not exist or could mean several things.
+- "last quarter" (or "previous quarter") with no quarter named: ask which quarter, with exactly these options:
+  "{QUARTER_OPTIONS[0]}" and "{QUARTER_OPTIONS[1]}".
+- "last month" with no month named: ask which month, with options "{MONTH_OPTIONS[0]}" and "{MONTH_OPTIONS[1]}".
+  Once the user has picked a quarter or month (it appears in the conversation), use it and do not ask again.
 Do NOT ask when the data rules above already define the term. These are defined, so answer them directly:
 - "revenue", "sales", "most revenue", "highest revenue" -> net revenue (rule 4); "excluding cancelled" -> gross (rule 3).
 - "returned most" -> units returned; "returned most often/frequently" -> number of return invoices (rule 2).
-- "last quarter" -> Q3 2011 (rule 11). "customers who generated the most revenue" names the metric, so do not ask.
+- "customers who generated the most revenue" names the metric, so do not ask.
 """.strip()

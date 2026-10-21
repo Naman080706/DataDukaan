@@ -8,7 +8,7 @@ const RULES: { term: string; body: string }[] = [
   { term: "Things that aren't products", body: "Postage, manual adjustments, bank charges, Amazon fees, samples, discounts, test codes and gift vouchers are left out of product rankings and kept in transaction totals." },
   { term: "Stock write-offs and bad debt", body: "Negative quantities without a C invoice are damaged or lost stock at £0. Invoices starting with A are bad-debt adjustments. Neither is a sale or a return." },
   { term: "Money", body: "Line value is quantity times unit price, in pounds sterling, rounded to the penny." },
-  { term: "Dates", body: "Years are calendar years. The data ends on 9 December 2011, so “last quarter” means July to September 2011, the last complete quarter, and the answer says so." },
+  { term: "Dates", body: "Years are calendar years. The data ends on 9 December 2011, part-way through a quarter, so “last quarter” could mean July to September (the last complete quarter) or October to 9 December. The agent asks which one you mean; “last month” works the same way." },
   { term: "Vague questions", body: "If the answer depends on a measure you didn't name, such as “best customers” or “top products”, the agent asks which one you mean instead of picking for you." },
   { term: "Safety", body: "The agent can only read. Each query is parsed before it runs; anything that writes, runs more than one statement, opens files or reaches other tables is refused, and the database itself is opened read-only." },
 ];

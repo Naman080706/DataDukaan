@@ -7,7 +7,7 @@ what a question means, it returns None (or asks back) instead of guessing.
 import re
 
 from . import db
-from .rules import LAST_FULL_QUARTER
+from .rules import MONTH_OPTIONS, QUARTER_OPTIONS
 
 # measure -> (select expression, alias, base filter, plain-English label)
 MEASURES = {
@@ -59,7 +59,8 @@ def _merge_followup(question: str, history: list[dict]) -> str:
     prev = next((t["content"] for t in reversed(history or []) if t.get("role") == "user"), None)
     if not prev:
         return q
-    is_followup = re.match(r"^(by|only|now|and|what about|how about|same|just|for|in)\b", q) or (
+    names_period = re.match(r"^(q[1-4]\s+20\d\d|(" + "|".join(MONTHS) + r")\s+20\d\d)\b", q)  # a picked quarter/month option
+    is_followup = re.match(r"^(by|only|now|and|what about|how about|same|just|for|in)\b", q) or names_period or (
         not METRIC_WORDS.search(q) and not re.search(r"\b(product|country|countries|customer|month|quarter|year)", q)
     )
     return f"{_norm(prev)} {q}" if is_followup else q
@@ -85,35 +86,33 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
     filters: list[str] = []
     period_label = ""
 
-    # Period: the last mention wins, so follow-ups like "... in 2010" override.
-    if "last quarter" in q:
-        filters.append(f"invoice_date >= '{LAST_FULL_QUARTER[0]}' AND invoice_date < '{LAST_FULL_QUARTER[1]}'")
-        period_label = " in Q3 2011"
-        assumptions.append("“Last quarter” is the last complete quarter in the data: Q3 2011 (Jul to Sep).")
-    elif "last month" in q:
-        filters.append("invoice_date >= '2011-11-01' AND invoice_date < '2011-12-01'")
-        period_label = " in November 2011"
-        assumptions.append("“Last month” is the last complete month in the data: November 2011.")
-    else:
-        mq = re.findall(r"\bq([1-4])\s*(?:of\s*)?(2009|2010|2011)\b", q)
-        mm = re.findall(r"\b(" + "|".join(MONTHS) + r")\s+(2009|2010|2011)\b", q)
-        my = re.findall(r"\b(2009|2010|2011)\b", q)
-        if mq:
-            n, y = int(mq[-1][0]), int(mq[-1][1])
-            start, end = f"{y}-{3 * n - 2:02d}-01", (f"{y}-{3 * n + 1:02d}-01" if n < 4 else f"{y + 1}-01-01")
-            filters.append(f"invoice_date >= '{start}' AND invoice_date < '{end}'")
-            period_label = f" in Q{n} {y}"
-        elif mm:
-            m, y = MONTHS[mm[-1][0]], int(mm[-1][1])
-            end = f"{y}-{m + 1:02d}-01" if m < 12 else f"{y + 1}-01-01"
-            filters.append(f"invoice_date >= '{y}-{m:02d}-01' AND invoice_date < '{end}'")
-            period_label = f" in {mm[-1][0].title()} {y}"
-        elif my:
-            y = int(my[-1])
-            filters.append(f"invoice_date >= '{y}-01-01' AND invoice_date < '{y + 1}-01-01'")
-            period_label = f" in {y}"
-            if y == 2011:
-                assumptions.append("2011 data ends on 9 December 2011.")
+    # Period: an explicit quarter/month/year wins; the last mention wins, so follow-ups can override.
+    mq = re.findall(r"\bq([1-4])\s*(?:of\s*)?(2009|2010|2011)\b", q)
+    mm = re.findall(r"\b(" + "|".join(MONTHS) + r")\s+(2009|2010|2011)\b", q)
+    my = re.findall(r"\b(2009|2010|2011)\b", q)
+    # The data stops part-way through Q4 2011, so relative periods are ambiguous: ask which one.
+    if re.search(r"\b(last|previous) quarter\b", q) and not mq:
+        return _clarify("Which quarter do you mean? The data ends on 9 December 2011.", QUARTER_OPTIONS)
+    if re.search(r"\b(last|previous) month\b", q) and not mm:
+        return _clarify("Which month do you mean? The data ends on 9 December 2011.", MONTH_OPTIONS)
+    if mq:
+        n, y = int(mq[-1][0]), int(mq[-1][1])
+        start, end = f"{y}-{3 * n - 2:02d}-01", (f"{y}-{3 * n + 1:02d}-01" if n < 4 else f"{y + 1}-01-01")
+        filters.append(f"invoice_date >= '{start}' AND invoice_date < '{end}'")
+        period_label = f" in Q{n} {y}"
+        if (n, y) == (4, 2011):
+            assumptions.append("Q4 2011 is incomplete: the data ends on 9 December 2011.")
+    elif mm:
+        m, y = MONTHS[mm[-1][0]], int(mm[-1][1])
+        end = f"{y}-{m + 1:02d}-01" if m < 12 else f"{y + 1}-01-01"
+        filters.append(f"invoice_date >= '{y}-{m:02d}-01' AND invoice_date < '{end}'")
+        period_label = f" in {mm[-1][0].title()} {y}"
+    elif my:
+        y = int(my[-1])
+        filters.append(f"invoice_date >= '{y}-01-01' AND invoice_date < '{y + 1}-01-01'")
+        period_label = f" in {y}"
+        if y == 2011:
+            assumptions.append("2011 data ends on 9 December 2011.")
 
     country = next((c for c in _known_countries() if re.search(r"\b" + re.escape(c.lower()) + r"\b", q)), None)
     if country:

@@ -51,15 +51,5 @@
     ],
     "title": "Net Sales Revenue for 2011",
     "model": "gemini-3.5-flash-lite"
-  },
-  "which products were returned most last quarter": {
-    "sql": "SELECT stock_code, max(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 10",
-    "assumptions": [
-      "Last quarter refers to the last complete calendar quarter of the dataset, Q3 2011 (2011-07-01 to 2011-10-01).",
-      "Returned most is measured by total units returned (SUM(-quantity)), per Data Rule 2.",
-      "Only valid products (is_product = TRUE) are included, per Data Rule 7."
-    ],
-    "title": "Top Products Returned by Units in Q3 2011",
-    "model": "gemini-3.5-flash-lite"
   }
 }

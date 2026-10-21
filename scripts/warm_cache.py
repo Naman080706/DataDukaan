@@ -20,7 +20,7 @@ from backend.agent import ask  # noqa: E402
 QUESTIONS = [
     "What were the top 5 products by revenue?",
     "What was our revenue excluding cancelled invoices?",
-    "Which products were returned most last quarter?",
+    "Which products were returned most in Q3 2011?",
     "Show monthly net revenue in 2011",
     "Which country generated the highest net revenue?",
     "Which customers generated the most revenue?",

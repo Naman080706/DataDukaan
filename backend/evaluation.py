@@ -37,6 +37,7 @@ def compare_engines() -> list[dict]:
             "mode": mode, "label": label, "run_at": run["run_at"], "total": len(res),
             "passed": sum(r["passed"] for r in res),
             "answered": ok("scalar") + ok("top_k"), "asked_back": ok("clarify"), "refused": ok("blocked"),
+            "asked_then_answered": ok("clarify_then_scalar") + ok("clarify_then_top_k"),
             "failed": sum(not r["passed"] for r in res),
             "failures": [{"id": r["id"], "reason": r["reason"]} for r in res if not r["passed"]],
             "models": sorted({r.get("model") for r in res if r.get("model")}),
@@ -62,7 +63,7 @@ def _numbers(rows):
 
 
 def compare(test: dict, expected: dict | None, actual: dict) -> tuple[bool, str]:
-    check = test["check"]
+    check = test["check"].removeprefix("clarify_then_")
     status = actual.get("status")
     if check == "clarify":
         return (status == "clarification", "asked a clarifying question" if status == "clarification"
@@ -100,11 +101,25 @@ def run_test(test: dict, mode: str = "llm") -> dict:
     expected = db.execute_readonly_sql(test["reference_sql"]) if test.get("reference_sql") else None
     # Saved answers are bypassed so the suite always tests the engine itself.
     # "chain" is the app's real path (Gemini, then Groq, then offline) minus saved answers.
-    actual = ask(test["question"], summarize=False, mode="auto" if mode == "chain" else mode, use_cache=False)
-    passed, reason = compare(test, expected, actual)
+    ask_mode = "auto" if mode == "chain" else mode
+    actual = ask(test["question"], summarize=False, mode=ask_mode, use_cache=False)
+    first = None
+    if test["check"].startswith("clarify_then_"):
+        # Two-turn test: the agent must ask back first, then answer correctly once the user picks an option.
+        first = {"status": actual.get("status"), "answer": actual.get("answer"), "options": actual.get("options", [])}
+        if actual.get("status") != "clarification":
+            passed, reason = False, f"did not ask back first (status={actual.get('status')})"
+        else:
+            history = [{"role": "user", "content": test["question"]}, {"role": "assistant", "content": actual.get("answer", "")}]
+            actual = ask(test["followup"], history, summarize=False, mode=ask_mode, use_cache=False)
+            passed, reason = compare(test, expected, actual)
+            reason = f"asked back, then after '{test['followup']}': {reason}"
+    else:
+        passed, reason = compare(test, expected, actual)
     return {
         "id": test["id"], "question": test["question"], "category": test["category"], "check": test["check"],
         "challenge": test.get("challenge"), "passed": passed, "reason": reason,
+        "followup": test.get("followup"), "first_turn": first,
         "reference_sql": test.get("reference_sql"),
         "expected": {"columns": expected["columns"], "rows": expected["rows"][:10]} if expected else None,
         "agent_status": actual.get("status"), "agent_sql": actual.get("sql"),
@@ -115,7 +130,7 @@ def run_test(test: dict, mode: str = "llm") -> dict:
 
 
 def summarise_run(results: list[dict], mode: str = "llm") -> dict:
-    amb = [r for r in results if r["check"] == "clarify"]
+    amb = [r for r in results if r["check"].startswith("clarify")]
     return {
         "mode": mode,
         "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

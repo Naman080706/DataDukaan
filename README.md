@@ -83,7 +83,7 @@ The rules live in one place, `backend/rules.py`. That same file feeds the LLM pr
 | **Missing customer ID** (~20% of lines) | Kept for aggregate totals (revenue, country revenue). Excluded from per-customer rankings and counts, and the answer says so. |
 | **Non-product codes** (POST, DOT, M, MANUAL, BANK CHARGES, PADS, C2, C3, CRUK, D, AMAZONFEE, S, B, SP1002, gift_*, TEST*, ADJUST*) | `is_product = FALSE`. Excluded from product rankings but kept in transaction totals. |
 | **Money** | `line_value = quantity × price`, in **GBP (£)**, rounded to 2 decimals. |
-| **Dates** | Calendar years, using half-open ranges. Data covers 2009-12-01 to 2011-12-09. Relative periods are anchored to the **end of the data**: "last quarter" = Q3 2011 (Jul to Sep), the last complete quarter. The answer states this assumption. |
+| **Dates** | Calendar years, using half-open ranges. Data covers 2009-12-01 to 2011-12-09. Relative periods are anchored to the **end of the data**, not today. Because the data stops part-way through Q4 2011, "last quarter" is ambiguous, so the agent **asks back**: "Q3 2011 (Jul to Sep, the last complete quarter)" or "Q4 2011 so far (1 Oct to 9 Dec)". "Last month" works the same way (November 2011, or December 2011 so far). This follows PRD test T09, "clarify intended quarter". |
 | **Sheet overlap** | The two Excel sheets both contain 2010-12-01 to 2010-12-09 (22,523 identical lines). Those lines are kept once, which gives 1,044,848 lines. Other duplicate-looking lines are kept, not silently dropped. |
 
 Line-type totals after ingestion: sale 1,019,653 · cancellation 19,165 · stock_adjustment 3,393 · zero_price 2,631 · bad_debt_adjustment 6.
