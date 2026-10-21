@@ -9,6 +9,11 @@ from .agent import ask
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SUITE_PATH = os.path.join(ROOT, "eval", "trap_suite.json")
 RESULTS_PATH = os.path.join(ROOT, "eval", "results.json")
+OFFLINE_RESULTS_PATH = os.path.join(ROOT, "eval", "results_offline.json")
+
+
+def results_path(mode: str) -> str:
+    return OFFLINE_RESULTS_PATH if mode == "offline" else RESULTS_PATH
 
 # Tolerance: money/counts must match to the penny (0.01) or 1e-6 relative.
 ABS_TOL = 0.01
@@ -63,9 +68,10 @@ def compare(test: dict, expected: dict | None, actual: dict) -> tuple[bool, str]
     return False, f"unknown check {check}"
 
 
-def run_test(test: dict) -> dict:
+def run_test(test: dict, mode: str = "llm") -> dict:
     expected = db.execute_readonly_sql(test["reference_sql"]) if test.get("reference_sql") else None
-    actual = ask(test["question"], summarize=False)
+    # Saved answers are bypassed so the suite always tests the engine itself.
+    actual = ask(test["question"], summarize=False, mode=mode, use_cache=False)
     passed, reason = compare(test, expected, actual)
     return {
         "id": test["id"], "question": test["question"], "category": test["category"], "check": test["check"],
@@ -75,13 +81,14 @@ def run_test(test: dict) -> dict:
         "agent_status": actual.get("status"), "agent_sql": actual.get("sql"),
         "agent_answer": actual.get("answer"),
         "actual": {"columns": actual.get("columns", []), "rows": actual.get("rows", [])[:10]},
-        "attempts": actual.get("attempts"), "latency_ms": actual.get("latency_ms"), "model": actual.get("model"),
+        "attempts": actual.get("attempts"), "latency_ms": actual.get("latency_ms"), "model": actual.get("model"), "source": actual.get("source"),
     }
 
 
-def summarise_run(results: list[dict]) -> dict:
+def summarise_run(results: list[dict], mode: str = "llm") -> dict:
     amb = [r for r in results if r["check"] == "clarify"]
     return {
+        "mode": mode,
         "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "total": len(results),
         "passed": sum(r["passed"] for r in results),
@@ -91,13 +98,14 @@ def summarise_run(results: list[dict]) -> dict:
     }
 
 
-def run_suite(ids: list[str] | None = None) -> dict:
+def run_suite(ids: list[str] | None = None, mode: str = "llm") -> dict:
     tests = [t for t in load_suite() if not ids or t["id"] in ids]
-    return summarise_run([run_test(t) for t in tests])
+    return summarise_run([run_test(t, mode) for t in tests], mode)
 
 
-def load_results() -> dict | None:
-    if not os.path.exists(RESULTS_PATH):
+def load_results(mode: str = "llm") -> dict | None:
+    path = results_path(mode)
+    if not os.path.exists(path):
         return None
-    with open(RESULTS_PATH, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)

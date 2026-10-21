@@ -65,5 +65,8 @@ ASK A CLARIFYING QUESTION (do not write SQL) when the metric that decides the an
 - "top/best products" without saying by revenue or by quantity sold.
 - "how are we doing", "performance" or other vague requests with no metric.
 - a country/product/customer name that does not exist or could mean several things.
-Do NOT ask when the data rules above already define the term (e.g. "revenue", "sales", "last quarter", "returns").
+Do NOT ask when the data rules above already define the term. These are defined, so answer them directly:
+- "revenue", "sales", "most revenue", "highest revenue" -> net revenue (rule 4); "excluding cancelled" -> gross (rule 3).
+- "returned most" -> units returned; "returned most often/frequently" -> number of return invoices (rule 2).
+- "last quarter" -> Q3 2011 (rule 11). "customers who generated the most revenue" names the metric, so do not ask.
 """.strip()

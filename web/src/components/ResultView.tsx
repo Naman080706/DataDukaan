@@ -161,6 +161,8 @@ const STEP_LABEL: Record<string, string> = {
   inspect_error: "Read the error and worked out a fix",
   summarise: "Wrote the answer from the returned rows",
   clarify: "Asked you to clarify",
+  saved_answer: "Found a saved answer to the same question",
+  offline_engine: "Switched to the offline rule engine",
   refuse: "Refused the request",
 };
 const STEP_COLOR: Record<string, string> = { ok: "bg-ledger", error: "bg-stamp", blocked: "bg-stamp", warn: "bg-carbon" };
@@ -181,7 +183,7 @@ function Steps({ r }: { r: AskResponse }) {
           </div>
         </li>
       ))}
-      {r.model && <li className="pl-9 text-[13px] text-muted">Model used: {r.model}</li>}
+      {r.model && <li className="pl-9 text-[13px] text-muted">{r.source === "offline" ? "Answered without AI by the offline rule engine" : `Model used: ${r.model}`}</li>}
     </ol>
   );
 }

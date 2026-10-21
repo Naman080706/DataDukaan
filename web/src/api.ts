@@ -8,7 +8,8 @@ export interface TraceStep {
 
 export interface AskResponse {
   id: string;
-  status: "success" | "clarification" | "refused" | "blocked" | "error";
+  status: "success" | "clarification" | "refused" | "blocked" | "error" | "unavailable";
+  source: "saved" | "ai" | "offline" | null;
   clarification_required: boolean;
   question: string;
   answer: string;
@@ -55,7 +56,10 @@ export interface TestResult extends TestCase {
   model: string | null;
 }
 
+export type EvalMode = "llm" | "offline";
+
 export interface EvalRun {
+  mode?: EvalMode;
   run_at: string;
   total: number;
   passed: number;
@@ -75,14 +79,14 @@ async function req<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export const api = {
-  health: () => req<{ status: string; database: string; rows?: number; llm_configured?: boolean }>("/api/health"),
+  health: () => req<{ status: string; database: string; rows?: number; llm_configured?: boolean; providers?: string[] }>("/api/health"),
   schema: () => req<{ tables: { name: string; columns: { name: string; type: string }[] }[]; row_count: number; date_range: string[] }>("/api/schema"),
   rules: () => req<{ data_rules: string; ambiguity_rules: string; non_product_codes: string[]; dataset_range: string[] }>("/api/rules"),
-  ask: (question: string, history: Turn[], conversation_id: string, inject_fault = false) =>
-    req<AskResponse>("/api/ask", { question, history, conversation_id, inject_fault }),
+  ask: (question: string, history: Turn[], conversation_id: string, inject_fault = false, mode: "auto" | "offline" = "auto") =>
+    req<AskResponse>("/api/ask", { question, history, conversation_id, inject_fault, mode }),
   suite: () => req<TestCase[]>("/api/evaluation/suite"),
-  runTests: (ids: string[]) => req<EvalRun>("/api/evaluation/run", { ids }),
-  savedResults: () => req<EvalRun>("/api/evaluation/results"),
+  runTests: (ids: string[], mode: EvalMode) => req<EvalRun>("/api/evaluation/run", { ids, mode }),
+  savedResults: (mode: EvalMode) => req<EvalRun>(`/api/evaluation/results?mode=${mode}`),
 };
 
 export function toCSV(columns: string[], rows: Cell[][]): string {

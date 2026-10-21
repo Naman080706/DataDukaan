@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
-import { api, EvalRun, TestCase, TestResult } from "../api";
+import { api, EvalMode, EvalRun, TestCase, TestResult } from "../api";
 import { SortableTable, SqlInspector } from "./ResultView";
 
 export default function Evaluation() {
@@ -9,11 +9,16 @@ export default function Evaluation() {
   const [saved, setSaved] = useState<EvalRun | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [mode, setMode] = useState<EvalMode>("llm");
 
   useEffect(() => {
     api.suite().then(setSuite);
-    api.savedResults().then(setSaved).catch(() => setSaved(null));
   }, []);
+  useEffect(() => {
+    setLive({});
+    setSaved(null);
+    api.savedResults(mode).then(setSaved).catch(() => setSaved(null));
+  }, [mode]);
 
   // One request per test keeps each call well inside serverless time limits.
   async function runAll() {
@@ -21,7 +26,7 @@ export default function Evaluation() {
     for (const t of suite) {
       setRunning(t.id);
       try {
-        const run = await api.runTests([t.id]);
+        const run = await api.runTests([t.id], mode);
         setLive((prev) => ({ ...prev, [t.id]: run.results[0] }));
       } catch (e) {
         setLive((prev) => ({ ...prev, [t.id]: { ...t, passed: false, reason: `request failed: ${e}` } as TestResult }));
@@ -54,7 +59,22 @@ export default function Evaluation() {
         </button>
       </div>
 
-      <dl className="mt-8 flex flex-wrap gap-x-12 gap-y-4 border-y-[3px] border-double border-ink py-4">
+      <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2" role="tablist" aria-label="What to test">
+        <span className="text-sm font-semibold">Testing</span>
+        {(["llm", "offline"] as EvalMode[]).map((m) => (
+          <button key={m} role="tab" aria-selected={mode === m} disabled={!!running} onClick={() => setMode(m)} className="tab">
+            {m === "llm" ? "The AI agent" : "The offline engine (no AI)"}
+          </button>
+        ))}
+      </div>
+      {mode === "offline" && (
+        <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-muted">
+          The offline engine is the backup for when every AI model is unavailable. It was written with these questions in view, so a high score
+          here shows it covers them, not that it handles any wording.
+        </p>
+      )}
+
+      <dl className="mt-6 flex flex-wrap gap-x-12 gap-y-4 border-y-[3px] border-double border-ink py-4">
         <Figure value={results.length ? `${passed}/${results.length}` : "–"} label="tests passed" />
         <Figure value={results.length ? `${Math.round((passed / results.length) * 100)}%` : "–"} label="execution accuracy" />
         <Figure value={amb.length ? `${amb.filter((r) => r.passed).length}/${amb.length}` : "–"} label="vague questions asked back" />

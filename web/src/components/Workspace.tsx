@@ -26,8 +26,11 @@ export function stampFor(e: Entry): StampKind | null {
   if (!r) return null;
   if (r.status === "clarification") return { text: "Needs detail", color: "text-carbon" };
   if (r.status === "refused" || r.status === "blocked") return { text: "Refused", color: "text-stamp" };
+  if (r.status === "unavailable") return { text: "Can't answer", color: "text-stamp" };
   if (r.status !== "success") return { text: "Failed", color: "text-stamp" };
   if (r.attempts > 1) return { text: "Fixed & re-run", color: "text-carbon" };
+  if (r.source === "offline") return { text: "Answered offline", color: "text-ledger" };
+  if (r.source === "saved") return { text: "Saved answer", color: "text-ledger" };
   return { text: "Answered", color: "text-ledger" };
 }
 
@@ -37,6 +40,7 @@ export default function Workspace() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [injectFault, setInjectFault] = useState(false);
+  const [simulateOutage, setSimulateOutage] = useState(false);
   const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -59,7 +63,7 @@ export default function Workspace() {
     setEntries((prev) => [...prev, { question }]);
     setSelected(idx);
     try {
-      const response = await api.ask(question, history(), conversationId, injectFault);
+      const response = await api.ask(question, history(), conversationId, injectFault, simulateOutage ? "offline" : "auto");
       setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, response } : e)));
     } catch (err) {
       setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, error: String(err) } : e)));
@@ -155,10 +159,16 @@ export default function Workspace() {
             {busy ? "Working" : "Ask"}
           </button>
         </div>
-        <label className="flex cursor-pointer items-center gap-2 px-4 pb-3 pt-2 text-[13px] text-muted">
-          <input type="checkbox" checked={injectFault} onChange={(e) => setInjectFault(e.target.checked)} className="accent-carbon" />
-          Demo mode: break a column name in the first SQL, to show the agent spotting the error and retrying
-        </label>
+        <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-3 pt-2 text-[13px] text-muted">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={injectFault} onChange={(e) => setInjectFault(e.target.checked)} className="accent-carbon" />
+            Demo: break the first SQL, to watch the agent fix it
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input type="checkbox" checked={simulateOutage} onChange={(e) => setSimulateOutage(e.target.checked)} className="accent-carbon" />
+            Demo: pretend the AI is down, to use the offline engine
+          </label>
+        </div>
       </form>
     </div>
   );

@@ -1,0 +1,65 @@
+{
+  "what were the top 5 products by revenue": {
+    "sql": "SELECT stock_code, max(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE is_product = TRUE AND line_type IN ('sale', 'cancellation') GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5",
+    "assumptions": [
+      "Revenue means net revenue (sales minus returns) according to data rules.",
+      "Products are filtered by is_product = TRUE.",
+      "Money is rounded to 2 decimal places."
+    ],
+    "title": "Top 5 Products by Net Revenue",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "what was our revenue excluding cancelled invoices": {
+    "sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale'",
+    "assumptions": [
+      "Revenue excluding cancelled invoices refers to gross revenue (Rule 3).",
+      "Sales are rows where line_type = 'sale' (Rule 1)."
+    ],
+    "title": "Gross Revenue (Excluding Cancelled Invoices)",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "show monthly net revenue in 2011": {
+    "sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1",
+    "assumptions": [
+      "Net revenue is defined as sales minus returns (line_type IN ('sale', 'cancellation')).",
+      "Year 2011 is defined as invoice_date >= '2011-01-01' and invoice_date < '2012-01-01'.",
+      "Money is in GBP and rounded to 2 decimal places."
+    ],
+    "title": "Monthly Net Revenue in 2011",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "which country generated the highest net revenue": {
+    "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 1",
+    "assumptions": [
+      "Net revenue is calculated as the sum of line_value for both sales and cancellations (Data Rule 4)."
+    ],
+    "title": "Country with Highest Net Revenue",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "how many invoices were cancelled": {
+    "sql": "SELECT COUNT(DISTINCT invoice) AS cancelled_invoice_count FROM transactions WHERE is_cancelled = TRUE",
+    "assumptions": [
+      "Cancelled invoices are identified by having is_cancelled = TRUE (invoice number starts with 'C')."
+    ],
+    "title": "Total Cancelled Invoices",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "what was our net sales revenue in 2011": {
+    "sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+    "assumptions": [
+      "Net revenue includes sales and returns (cancellations) for the calendar year 2011 (half-open range from 2011-01-01 to 2012-01-01)."
+    ],
+    "title": "Net Sales Revenue for 2011",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "which products were returned most last quarter": {
+    "sql": "SELECT stock_code, max(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 10",
+    "assumptions": [
+      "Last quarter refers to the last complete calendar quarter of the dataset, Q3 2011 (2011-07-01 to 2011-10-01).",
+      "Returned most is measured by total units returned (SUM(-quantity)), per Data Rule 2.",
+      "Only valid products (is_product = TRUE) are included, per Data Rule 7."
+    ],
+    "title": "Top Products Returned by Units in Q3 2011",
+    "model": "gemini-3.5-flash-lite"
+  }
+}

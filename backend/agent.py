@@ -1,12 +1,14 @@
 """Text-to-SQL agent: clarify -> generate -> validate -> execute -> (inspect error, retry) -> summarise.
 
 A hand-rolled tool loop; every step is recorded in `trace` so the UI can show it.
+Plans come from, in order: saved answers, the LLM chain (Gemini, then Groq), the offline rule engine.
 """
 import json
 import time
 
-from . import db
+from . import cache, db
 from .llm import LLMError, generate_json
+from .offline import describe_result, plan_offline
 from .rules import AMBIGUITY_RULES, DATA_RULES, SCHEMA_DOC
 from .validator import ValidationError, validate_sql
 
@@ -73,29 +75,54 @@ def choose_chart(columns: list[str], rows: list[list]) -> str:
     return "bar" if len(rows) <= 50 else "none"
 
 
-def ask(question: str, history: list[dict] | None = None, inject_fault: bool = False, summarize: bool = True) -> dict:
+def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step) -> tuple[dict | None, str]:
+    """Pick a plan. mode: 'auto' (saved -> AI -> offline), 'llm' (AI only), 'offline' (rule engine only)."""
+    if mode == "auto" and use_cache and not history:
+        saved = cache.get(question)
+        if saved:
+            step("saved_answer", "ok", "Reused verified SQL from an earlier identical question; it is re-checked and re-run now")
+            return {"action": "sql", **saved, "_model": saved.get("model")}, "saved"
+    if mode in ("auto", "llm"):
+        step("get_schema", "ok", "transactions table + data rules loaded into the prompt")
+        user_msg = f"Conversation so far:\n{_history_text(history)}\n\nNew question: {question}"
+        try:
+            return generate_json(PLANNER_SYSTEM, user_msg), "ai"
+        except LLMError as e:
+            step("generate_sql", "error", str(e))
+            if mode == "llm":
+                return None, "ai"
+    step("offline_engine", "ok" if mode == "offline" else "warn",
+         "Answering with the offline rule engine (no AI): pre-checked SQL templates and the same data rules")
+    return plan_offline(question, history), "offline"
+
+
+def ask(question: str, history: list[dict] | None = None, inject_fault: bool = False, summarize: bool = True,
+        mode: str = "auto", use_cache: bool = True) -> dict:
     t0 = time.perf_counter()
     trace: list[dict] = []
     history = history or []
     resp = {
         "status": "error", "clarification_required": False, "question": question, "answer": "", "sql": None,
         "columns": [], "rows": [], "currency": "GBP", "chart_type": "none", "assumptions": [], "trace": trace,
-        "attempts": 0, "model": None,
+        "attempts": 0, "model": None, "source": None,
     }
 
     def step(tool, status, detail):
         trace.append({"tool": tool, "status": status, "detail": detail})
 
     # 1-3. Understand the question; clarify or plan SQL.
-    step("get_schema", "ok", "transactions table + data rules loaded into the prompt")
-    user_msg = f"Conversation so far:\n{_history_text(history)}\n\nNew question: {question}"
-    try:
-        plan = generate_json(PLANNER_SYSTEM, user_msg)
-    except LLMError as e:
-        step("generate_sql", "error", str(e))
-        resp["answer"] = f"The language model is unavailable right now: {e}"
+    plan, source = _plan(question, history, mode, use_cache and not inject_fault, step)
+    resp["source"] = source
+    if plan is None:
+        resp["status"] = "unavailable"
+        resp["answer"] = (
+            "The AI models are unavailable and the offline engine doesn't recognise this question. "
+            "Try naming a measure (revenue, units, orders, returns), a breakdown (product, country, customer, month) "
+            "and a period (a year, a month like March 2011, or last quarter)."
+            if source == "offline" else "The AI models are unavailable right now. Try again in a minute."
+        )
         return _finish(resp, t0)
-    resp["model"] = plan.get("_model")
+    resp["model"] = plan.get("_model") if source != "offline" else "offline rule engine"
     action = plan.get("action")
 
     if action == "clarify":
@@ -111,7 +138,8 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     sql = plan.get("sql", "")
     resp["assumptions"] = plan.get("assumptions", [])
     resp["title"] = plan.get("title", "")
-    step("generate_sql", "ok", sql)
+    if source != "saved":
+        step("generate_sql", "ok", sql)
     if inject_fault:
         col = next((c for c in ("line_value", "quantity", "invoice", "is_cancelled", "country", "customer_id") if c in sql), None)
         sql = sql.replace(col, col + "_x", 1) if col else sql.replace("SELECT", "SELEC", 1)
@@ -154,8 +182,11 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     resp.update(status="success", sql=sql, columns=result["columns"], rows=result["rows"],
                 truncated=result["truncated"], chart_type=choose_chart(result["columns"], result["rows"]))
 
+    if source == "ai" and mode == "auto" and use_cache and not history and not inject_fault:
+        cache.put(question, {**plan, "sql": sql, "model": resp["model"]})
+
     # 7. Summarise only the actual result.
-    if summarize:
+    if summarize and source != "offline":
         try:
             s = generate_json(SUMMARY_SYSTEM, json.dumps({
                 "question": question, "assumptions": resp["assumptions"], "columns": result["columns"],
@@ -166,7 +197,8 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
         except LLMError as e:
             step("summarise", "error", str(e))
     if not resp["answer"]:
-        resp["answer"] = f"{resp.get('title') or 'Result'}: {result['row_count']} row(s). Amounts in GBP."
+        resp["answer"] = describe_result(resp.get("title") or "Result", result["columns"], result["rows"])
+        step("summarise", "ok", "answer built from the returned rows by a template (no AI)")
     return _finish(resp, t0)
 
 
