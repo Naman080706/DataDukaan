@@ -21,18 +21,29 @@ def _models() -> list[str]:
     return [primary] + [m.strip() for m in fallbacks if m.strip() and m.strip() != primary]
 
 
-def generate_json(system: str, user: str, temperature: float = 0.0) -> dict:
-    """Call Gemini in JSON mode, falling back to the next model on rate limits/outages."""
+def _fast_models() -> list[str]:
+    fast = os.environ.get("GEMINI_FAST_MODEL", "gemini-3.5-flash-lite")
+    return [fast] + [m for m in _models() if m != fast]
+
+
+def generate_json(system: str, user: str, temperature: float = 0.0, fast: bool = False) -> dict:
+    """Call Gemini in JSON mode, falling back to the next model on rate limits/outages.
+
+    fast=True uses a lite model first (summaries); SQL planning uses the stronger model with low thinking.
+    """
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise LLMError("GEMINI_API_KEY is not set.")
-    body = {
-        "systemInstruction": {"parts": [{"text": system}]},
-        "contents": [{"role": "user", "parts": [{"text": user}]}],
-        "generationConfig": {"temperature": temperature, "responseMimeType": "application/json"},
-    }
     last_err = None
-    for model in _models():
+    for model in _fast_models() if fast else _models():
+        config = {"temperature": temperature, "responseMimeType": "application/json"}
+        if model.startswith("gemini-3") and "lite" not in model:
+            config["thinkingConfig"] = {"thinkingLevel": "low"}
+        body = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": config,
+        }
         try:
             r = httpx.post(API_URL.format(model=model), params={"key": key}, json=body, timeout=60)
         except httpx.HTTPError as e:

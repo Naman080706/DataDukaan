@@ -26,7 +26,9 @@ export default function Workspace() {
   const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [entries]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [entries]);
 
   const history = (): Turn[] =>
     entries.flatMap((e) => [

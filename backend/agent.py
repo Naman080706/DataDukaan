@@ -160,7 +160,7 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
             s = generate_json(SUMMARY_SYSTEM, json.dumps({
                 "question": question, "assumptions": resp["assumptions"], "columns": result["columns"],
                 "rows": result["rows"][:20], "total_rows": result["row_count"],
-            }, default=str))
+            }, default=str), fast=True)
             resp["answer"] = s.get("answer", "")
             step("summarise", "ok", "answer written from the returned rows only")
         except LLMError as e:
