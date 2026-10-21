@@ -2,7 +2,7 @@
 
 **NEXAI 2026 Hackathon · Track 1 (Agentic AI & Intelligent Automation) · Problem Statement 1.2: Text-to-SQL**
 
-Live app: _to be added after deployment_ · Dev log: [DEV_LOG.md](DEV_LOG.md)
+Live app: _to be added after deployment_
 
 ## Problem
 
@@ -68,7 +68,7 @@ flowchart LR
 - **LLM:** Google Gemini API (`gemini-3.5-flash` with low thinking for SQL, `gemini-3.5-flash-lite` for summaries, falling back to other Gemini models on rate limits), then Groq (optional key), then the offline rule engine
 - **Preprocessing:** pandas, openpyxl, pyarrow (run once)
 - **Hosting:** Vercel (static frontend and a Python serverless function)
-- **AI coding tools:** Claude Code (Anthropic) assisted with writing code; see DEV_LOG.md.
+- **AI coding tools:** Claude Code (Anthropic) assisted with writing code.
 
 ## Data rules
 
