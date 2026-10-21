@@ -12,8 +12,12 @@ class LLMError(Exception):
 
 
 def _models() -> list[str]:
-    primary = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-    fallbacks = os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-2.5-flash,gemini-2.5-flash-lite").split(",")
+    # Free-tier quotas are per model, so falling back across models spreads the load.
+    primary = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+    fallbacks = os.environ.get(
+        "GEMINI_FALLBACK_MODELS",
+        "gemini-2.5-flash,gemini-flash-latest,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash-lite",
+    ).split(",")
     return [primary] + [m.strip() for m in fallbacks if m.strip() and m.strip() != primary]
 
 

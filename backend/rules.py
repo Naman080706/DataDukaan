@@ -37,9 +37,10 @@ DATA_RULES = f"""
 DATA RULES (apply to every query unless the user explicitly asks otherwise):
 1. Sales = rows WHERE line_type = 'sale' (not cancelled, quantity > 0, price > 0, not bad-debt).
 2. Returns/cancellations = rows WHERE line_type = 'cancellation' (invoice starts with 'C'). Their quantity and
-   line_value are negative. "Returned most" = rank by SUM(-quantity) over these rows.
+   line_value are negative. "Returned most" = rank by units, SUM(-quantity) over these rows.
+   "Returned most frequently / most often" = rank by number of return invoices, COUNT(DISTINCT invoice).
 3. Gross revenue (= "revenue excluding cancelled invoices") = SUM(line_value) WHERE line_type = 'sale'.
-4. Net revenue (default meaning of "revenue", "sales value", "net sales") =
+4. Net revenue (default meaning of "revenue", "sales", "sales value", "net sales") =
    SUM(line_value) WHERE line_type IN ('sale', 'cancellation')  (sales minus returns).
 5. Total transaction value = SUM(line_value) over ALL rows (no filter). Only use when explicitly asked.
 6. Stock adjustments (line_type = 'stock_adjustment', negative qty without a 'C' invoice, price 0) and
