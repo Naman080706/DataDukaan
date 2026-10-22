@@ -10,3 +10,5 @@ data/raw/*
 dist/
 /.claude/
 *.tsbuildinfo
+
+brag-output/
