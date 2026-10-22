@@ -326,4 +326,6 @@ Both the original dataset and the processed database are in the repo:
 
 ## Team
 
-_Team details to be added._
+- Vrisha Agrawal
+- Shresth Rohan
+- Naman Jain
