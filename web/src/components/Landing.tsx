@@ -19,6 +19,10 @@ const TRUST: { term: string; body: string }[] = [
     body: "We wrote 18 tricky questions, including multi-part ones, and worked out the correct answers ourselves. DataDukaan gets all 18 right.",
   },
   {
+    term: "Works on your own data too",
+    body: "Add your own sales file or any table (CSV, Excel, JSON or Parquet) and ask about it instead. It's read in your browser and never uploaded.",
+  },
+  {
     term: "Looks, never touches",
     body: "It can read your sales records but never change or delete them. If the AI service is busy, it can still answer common questions.",
   },

@@ -21,6 +21,17 @@ DataDukaan answers plain-English questions about two years of real transactions 
 6. **Answers only from the returned rows.** The answer shows the SQL, a sortable table, an automatically chosen bar or line chart, CSV export and the full tool-call trace.
 7. **Keeps history.** The session's questions and answers survive a page reload, and any answer can be kept under "Saved analyses". Both are stored in the browser (localStorage), so they belong to that browser only.
 
+### Your own data
+
+Signed-in users can add their own file on the **Your data** page and ask questions about it instead of the built-in dataset. Each user's file is private to them and their browser; everyone else still sees the built-in data.
+
+- **Formats:** CSV/TSV, Excel (.xlsx, .xls, .ods), JSON/JSONL and Parquet, up to 200 MB.
+- **Stays on the user's computer:** the file is loaded into **DuckDB-WASM** (a DuckDB database running inside the browser) and is never uploaded. The server only receives the column names, five sample rows and the result rows of each answer. The file is kept in the browser's IndexedDB so it survives a reload, and the user can switch back to the built-in data or remove the file at any time.
+- **How a question runs:** the browser asks the backend to plan (`/api/dataset/plan`: AI or backup mode, then the same SQL validator, with the user's table as the only allowed table), runs the SQL locally, sends any error to `/api/dataset/fix` (up to 2 retries), and sends the first 20 result rows to `/api/dataset/summarise` for the plain-English answer and chart choice.
+- **Sales files get the full rules:** if the columns look like sales data (an order/invoice number, product code or name, quantity, unit price or line total, and a date, under common names such as `Order ID`, `SKU`, `Qty`, `Unit Price`, `Order Date`), the file is converted to the same `transactions` layout as the built-in data. Then the counting rules (returns kept apart from sales, shipping/fees left out of product rankings, customers without an ID handled), multi-step questions and backup mode all work, with "this year", "last quarter" and so on worked out from the file's own dates. Negative quantities are treated as returns. The built-in dataset's own non-product codes (C2, C3, M…) are not applied to other files.
+- **Any other table:** the AI gets the column names, types and five sample rows, works out what the columns mean, and says how it read them in each answer. Money has no currency symbol, because the currency isn't known.
+- **Limits:** trap tests and saved answers use the built-in data only. Backup mode works only for sales-type files. Very large files depend on the browser's memory.
+
 ### Multi-step questions
 
 Some questions need one answer to find another: "What were the top 5 products by revenue in the best sales month of this year?" means first find the best month, then rank products inside it.
@@ -88,7 +99,7 @@ flowchart LR
 | `run_trap_suite()` | `backend/evaluation.py`, `scripts/run_eval.py` |
 
 ### Tech stack
-- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Recharts, lucide-react (hash routes for landing, sign-in, app and profile)
+- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Recharts, lucide-react (hash routes for landing, sign-in, app and profile); DuckDB-WASM 1.29.0 (loaded from jsDelivr) and SheetJS 0.18.5 for users' own files
 - **Backend:** Python 3.12+, FastAPI, Pydantic, DuckDB 2.0, sqlglot, httpx
 - **LLM:** Google Gemini API (`gemini-3.5-flash` with low thinking for SQL, `gemini-3.5-flash-lite` for summaries, falling back to other Gemini models on rate limits), then Groq (optional key), then the offline rule engine
 - **Preprocessing:** pandas, openpyxl, pyarrow (run once)
@@ -207,6 +218,9 @@ Both the original dataset and the processed database are in the repo:
 | `/api/auth/request-code` | POST | `{email}`: emails a 6-digit code, returns a signed challenge |
 | `/api/auth/verify` | POST | `{challenge, code}`: returns a session token |
 | `/api/auth/me` | GET | the signed-in email and session dates |
+| `/api/dataset/plan` | POST | plan an answer over a user's own file (columns + sample rows only); returns validated SQL, a clarification or a refusal |
+| `/api/dataset/fix` | POST | fix SQL that failed in the browser |
+| `/api/dataset/summarise` | POST | plain-English answer and chart type from the result rows |
 
 ### Deployment (Vercel)
 `vercel.json` builds `web/` as static files and serves `api/index.py` as a Python function, bundling `backend/`, `data/retail.duckdb` and `eval/` with it. Set `GEMINI_API_KEY` in the Vercel project's environment variables.
