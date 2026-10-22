@@ -6,7 +6,7 @@ Plans come from, in order: saved answers, the LLM chain (Gemini, then Groq), the
 import json
 import time
 
-from . import ahead, cache, db
+from . import ahead, cache, claims, db
 from .llm import LLMError, generate_json
 from .offline import _known_countries, describe_result, plan_offline
 from .rules import AMBIGUITY_RULES, DATA_RULES, SCHEMA_DOC
@@ -148,6 +148,8 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     if future:
         trace.extend(future.pop("trace", []))
         resp.update(future, source="tools")
+        if resp["status"] == "success":
+            _check_claims(resp, question, step, rewrite=False)
         return _finish(resp, t0)
 
     # 1-3. Understand the question; clarify or plan SQL.
@@ -241,7 +243,31 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     if not resp["answer"]:
         resp["answer"] = describe_result(resp.get("title") or "Result", result["columns"], result["rows"])
         step("summarise", "ok", "answer built from the returned rows by a template (no AI)")
+    _check_claims(resp, question, step, rewrite=True)
     return _finish(resp, t0)
+
+
+def _check_claims(resp: dict, question: str, step, rewrite: bool) -> None:
+    """8. Check every claim in the answer against the rows and the SQL. An answer that states something the result
+    doesn't support is rewritten from the rows (the draft is kept for the evaluation page); explanations stay,
+    marked as hypotheses."""
+    extra = [(e["label"], e["value"]) for e in resp.get("evidence_numbers", [])]
+    check = lambda text: claims.check_answer(text, resp["columns"], resp["rows"], resp.get("sql"), question,  # noqa: E731
+                                             resp.get("assumptions"), extra, _known_countries())
+    result = check(resp["answer"])
+    if rewrite and result["status"] in ("contradicted", "unsupported"):
+        bad = next(c for c in result["claims"] if c["verdict"] in ("contradicted", "unsupported"))
+        resp["draft_answer"], resp["draft_claims"] = resp["answer"], result
+        resp["answer"] = describe_result(resp.get("title") or "Result", resp["columns"], resp["rows"])
+        step("check_claims", "warn", f"The first draft said “{bad['text']}”, but {bad['evidence']}. "
+                                     f"Rewrote the answer from the result instead.")
+        result = check(resp["answer"])
+    else:
+        n, h = result["counts"]["supported"], result["counts"]["hypothesis"]
+        step("check_claims", "ok" if result["status"] in ("grounded", "hypotheses") else "warn",
+             f"{n} statement{'s' if n != 1 else ''} traced to the result"
+             + (f"; {h} explanation{'s' if h != 1 else ''} marked as a hypothesis" if h else ""))
+    resp["claims"] = result
 
 
 def _plan_ahead(question: str) -> dict | None:
