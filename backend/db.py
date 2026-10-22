@@ -38,8 +38,11 @@ def _jsonable(v):
     return v
 
 
-def execute_readonly_sql(sql: str) -> dict:
-    """Run an already-validated SELECT. Returns columns, rows (capped), timing."""
+def execute_readonly_sql(sql: str, max_rows: int = MAX_ROWS) -> dict:
+    """Run an already-validated SELECT. Returns columns, rows (capped), timing.
+
+    max_rows is raised only by internal tools (e.g. batch monthly series for the action list), never by user SQL.
+    """
     cur = get_connection().cursor()
     timer = threading.Timer(TIMEOUT_S, cur.interrupt)
     timer.start()
@@ -47,12 +50,12 @@ def execute_readonly_sql(sql: str) -> dict:
     try:
         cur.execute(sql)
         columns = [d[0] for d in cur.description] if cur.description else []
-        raw = cur.fetchmany(MAX_ROWS + 1)
+        raw = cur.fetchmany(max_rows + 1)
     finally:
         timer.cancel()
         cur.close()
-    truncated = len(raw) > MAX_ROWS
-    rows = [[_jsonable(v) for v in r] for r in raw[:MAX_ROWS]]
+    truncated = len(raw) > max_rows
+    rows = [[_jsonable(v) for v in r] for r in raw[:max_rows]]
     return {
         "columns": columns,
         "rows": rows,
