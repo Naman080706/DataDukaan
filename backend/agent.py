@@ -19,7 +19,12 @@ EXPLORE_ACTION = """
 Use "explore" BEFORE answering when you need to look at the actual data first: how a value is spelled or stored
 (e.g. which values a column really contains, matching a name the user typed), whether a column holds what you think,
 or a range you need. You will get the result and can then answer. At most 2 explores per question; don't explore
-when the data profile already tells you what you need."""
+when the data profile already tells you what you need.
+RULE: if you would filter on a text value (a name, product, city, category...) that is NOT listed among that column's
+values in the data profile, you MUST explore first, e.g.
+SELECT DISTINCT item_name FROM dataset WHERE item_name ILIKE '%assam%tea%' LIMIT 20
+then use the exact stored value. Never guess a stored value's exact spelling.
+If you are told a previous answer came back empty, explore to find how the values are really stored, then answer."""
 
 
 def planner_system(schema: str, rules: str, ambiguity: str, table: str = "transactions", year: int = 2011,

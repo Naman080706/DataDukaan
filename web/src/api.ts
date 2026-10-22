@@ -115,8 +115,8 @@ export const api = {
     req<any>("/api/dataset/plan", { question, history, dataset, mode, observations }),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   datasetFix: (question: string, sql: string, error: string, dataset: unknown) => req<any>("/api/dataset/fix", { question, sql, error, dataset }),
-  datasetSummarise: (question: string, title: string, assumptions: string[], columns: string[], rows: Cell[][], source: "ai" | "offline") =>
-    req<{ answer: string; chart_type: "bar" | "line" | "none"; summary_by: string }>("/api/dataset/summarise", { question, title, assumptions, columns, rows, source }),
+  datasetSummarise: (question: string, title: string, assumptions: string[], columns: string[], rows: Cell[][], source: "ai" | "offline", total_rows = rows.length) =>
+    req<{ answer: string; chart_type: "bar" | "line" | "none"; summary_by: string }>("/api/dataset/summarise", { question, title, assumptions, columns, rows, source, total_rows }),
   savedResults: (mode: EvalMode) => req<EvalRun>(`/api/evaluation/results?mode=${mode}`),
 };
 

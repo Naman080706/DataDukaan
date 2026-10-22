@@ -14,8 +14,11 @@ function datasetInfo(p: DatasetProfile) {
   };
 }
 
+type Observation = { sql: string; why: string; columns: string[]; rows: Cell[][]; error: string | null };
+
 export async function askLocal(
   question: string, history: Turn[], profile: DatasetProfile, injectFault: boolean, mode: "auto" | "offline",
+  prior?: { observations: Observation[]; trace: TraceStep[] },
 ): Promise<AskResponse> {
   const t0 = performance.now();
   const ds = datasetInfo(profile);
@@ -26,20 +29,20 @@ export async function askLocal(
   const done = (r: Partial<AskResponse>) => ({ ...base, ...r, latency_ms: Math.round(performance.now() - t0) });
 
   // The AI may look at the data first (up to 2 small look-ups run here), then plan the answer with what it saw.
-  const trace: TraceStep[] = [];
-  const observations: { sql: string; why: string; columns: string[]; rows: Cell[][]; error: string | null }[] = [];
-  let plan = await api.datasetPlan(question, history, ds, mode);
+  const trace: TraceStep[] = [...(prior?.trace ?? [])];
+  const observations: Observation[] = [...(prior?.observations ?? [])];
+  let plan = await api.datasetPlan(question, history, ds, mode, observations);
   trace.push(...(plan.trace ?? []));
   while (plan.status === "explore" && observations.length < MAX_EXPLORES) {
     try {
       const look = await runQuery(plan.sql, 50);
       const rows = look.rows.slice(0, 30).map((r) => r.map((v) => (typeof v === "string" ? v.slice(0, 60) : v)));
       observations.push({ sql: plan.sql, why: plan.why ?? "", columns: look.columns, rows, error: null });
-      trace.push({ tool: "execute_readonly_sql", status: "ok", detail: `look-up: ${look.rows.length} rows in ${look.elapsed_ms} ms, in your browser` });
+      trace.push({ tool: "explore_run", status: "ok", detail: `look-up: ${look.rows.length} rows in ${look.elapsed_ms} ms, in your browser` });
     } catch (e) {
       const err = (e instanceof Error ? e.message : String(e)).split("\n")[0].slice(0, 300);
       observations.push({ sql: plan.sql, why: plan.why ?? "", columns: [], rows: [], error: err });
-      trace.push({ tool: "execute_readonly_sql", status: "error", detail: `look-up failed: ${err}` });
+      trace.push({ tool: "explore_run", status: "error", detail: `look-up failed: ${err}` });
     }
     plan = await api.datasetPlan(question, history, ds, mode, observations);
     trace.push(...(plan.trace ?? []).filter((t: TraceStep) => t.tool !== "get_schema"));
@@ -78,8 +81,18 @@ export async function askLocal(
   }
   if (!result) return done({ ...common, sql, attempts });
 
+  // Nothing matched: usually a value spelled differently from how it's stored. Tell the AI and let it look and retry once.
+  if (result.rows.length === 0 && !prior && common.source !== "offline") {
+    trace.push({ tool: "empty_retry", status: "warn", detail: "Nothing matched, so DataDukaan checked how the values are actually stored" });
+    const empty: Observation = {
+      sql, why: "The first answer came back empty", columns: result.columns, rows: [],
+      error: "No rows matched. A filter value probably doesn't match how the data is stored: explore to find the stored value.",
+    };
+    return askLocal(question, history, profile, false, mode, { observations: [...observations, empty], trace });
+  }
+
   const summary = await api
-    .datasetSummarise(question, plan.title ?? "", plan.assumptions ?? [], result.columns, result.rows.slice(0, 20), common.source === "offline" ? "offline" : "ai")
+    .datasetSummarise(question, plan.title ?? "", plan.assumptions ?? [], result.columns, result.rows.slice(0, 20), common.source === "offline" ? "offline" : "ai", result.rows.length)
     .catch(() => null);
   trace.push({ tool: "summarise", status: summary ? "ok" : "error", detail: summary?.summary_by === "ai" ? "answer written from the returned rows only" : "answer built from the returned rows by a template (no AI)" });
   return done({

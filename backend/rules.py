@@ -187,7 +187,7 @@ def profile_text(stats: list[dict], limit: int = 7000) -> str:
         if c.get("distinct") is not None:
             bits.append(f"~{c['distinct']:,} distinct")
         if c.get("min") is not None and c.get("max") is not None:
-            bits.append(f"range {str(c['min'])[:25]} to {str(c['max'])[:25]}")
+            bits.append(f"range {str(c['min'])[:60]!r} to {str(c['max'])[:60]!r}")
         if c.get("avg") is not None:
             bits.append(f"average {c['avg']}")
         top = c.get("top") or []
@@ -219,7 +219,8 @@ Sample rows (columns in the order above):
 DATA RULES for this user-uploaded table:
 1. Use only the columns listed. Quote column names with double quotes if they are not plain lowercase identifiers.
 2. Work out what each column means from its name, type, the data profile and the sample rows; say in "assumptions"
-   how you interpreted the columns you used (in plain English). Filter on values exactly as they appear in the profile
+   how you interpreted the columns you used, in plain English with the columns described in everyday words
+   ("the units-in-stock figure"), never raw column names like units_in_stock. Filter on values exactly as they appear in the profile
    (case and spelling); if a value the user mentions isn't listed, explore first or match it case-insensitively.
 3. Money: the currency is not known; don't add a currency symbol. Round money-like values to 2 decimals.
 4. Always add a LIMIT (<= 200) for row-level or ranking results.{period}

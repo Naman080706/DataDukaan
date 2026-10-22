@@ -166,13 +166,15 @@ export function SqlInspector({ sql, note = true }: { sql: string; note?: boolean
 }
 
 const STEP_LABEL: Record<string, string> = {
-  get_schema: "Read the counting rules",
+  get_schema: "Read the counting rules and what the data holds",
   plan_steps: "Broke the question into smaller steps",
   explore: "Looked at your data first",
+  explore_run: "Checked what the data holds",
+  empty_retry: "Nothing matched, so it checked how the values are stored",
   generate_sql: "Worked out how to calculate it",
   inject_fault: "Demo: broke the calculation on purpose",
-  validate_sql: "Checked it only reads the records, never changes them",
-  execute_readonly_sql: "Ran the calculation on the sales records",
+  validate_sql: "Checked it only reads the data, never changes it",
+  execute_readonly_sql: "Ran the calculation on the data",
   inspect_error: "Spotted the problem and fixed it",
   summarise: "Wrote the answer from the results",
   clarify: "Asked you which one you meant",

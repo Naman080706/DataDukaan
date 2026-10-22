@@ -168,7 +168,8 @@ def fix(question: str, sql: str, error: str, ds: dict) -> dict:
     return {"status": "run", "sql": new_sql, "trace": trace}
 
 
-def summarise(question: str, title: str, assumptions: list[str], columns: list[str], rows: list[list], source: str) -> dict:
+def summarise(question: str, title: str, assumptions: list[str], columns: list[str], rows: list[list], source: str,
+              total_rows: int | None = None) -> dict:
     """Plain-English answer from the rows the browser got back, plus the chart type."""
     rows = rows[:MAX_RESULT_ROWS]
     chart = choose_chart(columns, rows)
@@ -176,7 +177,9 @@ def summarise(question: str, title: str, assumptions: list[str], columns: list[s
         try:
             s = generate_json(summary_system("Money: the currency isn't stated, so write amounts like 1,234.56 with no symbol."),
                               json.dumps({"question": question, "assumptions": assumptions, "columns": columns,
-                                          "rows": rows, "total_rows": len(rows)}, default=str), fast=True)
+                                          "rows": rows, "total_rows": total_rows or len(rows),
+                                          "note": "If total_rows is more than the rows shown, say how many there are in total "
+                                                  "rather than implying the list is complete."}, default=str), fast=True)
             if s.get("answer"):
                 return {"answer": s["answer"], "chart_type": chart, "summary_by": "ai"}
         except LLMError:

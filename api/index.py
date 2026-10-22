@@ -117,6 +117,7 @@ class DatasetSummaryRequest(BaseModel):
     columns: list[str] = Field(max_length=60)
     rows: list[list] = Field(max_length=50)
     source: Literal["ai", "offline"] = "ai"
+    total_rows: int | None = None
 
 
 class EvalRequest(BaseModel):
@@ -187,7 +188,7 @@ def dataset_fix(req: DatasetFixRequest, user: dict = Signed):
 
 @app.post("/api/dataset/summarise")
 def dataset_summarise(req: DatasetSummaryRequest, user: dict = Signed):
-    return client_agent.summarise(req.question, req.title, req.assumptions, req.columns, req.rows, req.source)
+    return client_agent.summarise(req.question, req.title, req.assumptions, req.columns, req.rows, req.source, req.total_rows)
 
 
 @app.get("/api/query/{qid}")
