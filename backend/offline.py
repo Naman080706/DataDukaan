@@ -352,7 +352,8 @@ def plan_offline(question: str, history: list[dict] | None = None, ctx: Ctx | No
     if is_time and dim != rank_dim:
         order, limit = "1 ASC", 200
     elif is_time:  # "which month was best": every period, best (or worst) first
-        order, limit = f"{alias} {'ASC' if re.search(r'\b(least|lowest|fewest|worst|weakest)\b', q) else 'DESC'}", 200
+        worst_first = re.search(r"\b(least|lowest|fewest|worst|weakest)\b", q)
+        order, limit = f"{alias} {'ASC' if worst_first else 'DESC'}", 200
     else:
         m = re.search(r"\b(?:top|bottom|first)\s+(\d{1,3})\b", q)
         limit = min(int(m.group(1)), 200) if m else 10

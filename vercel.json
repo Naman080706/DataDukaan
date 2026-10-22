@@ -6,10 +6,14 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
-      "includeFiles": "{backend/**,data/retail.duckdb,eval/**}"
+      "includeFiles": "{backend/**,data/retail.duckdb,eval/**}",
+      "excludeFiles": "{data/raw/**,web/**,tests/**,docs/**,scripts/**,eval/results_learning_offline.json}"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    }
   ]
 }

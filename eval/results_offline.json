@@ -1,6 +1,6 @@
 {
   "mode": "offline",
-  "run_at": "2026-10-22T09:37:49+00:00",
+  "run_at": "2026-10-22T09:47:15+00:00",
   "total": 18,
   "passed": 18,
   "execution_accuracy": 1.0,
@@ -57,7 +57,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 58,
+      "latency_ms": 67,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -184,7 +184,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 27,
+      "latency_ms": 28,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -311,7 +311,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 33,
+      "latency_ms": 35,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -419,7 +419,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 6,
+      "latency_ms": 8,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -513,7 +513,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 18,
+      "latency_ms": 19,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -623,7 +623,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 19,
+      "latency_ms": 21,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -712,7 +712,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 10,
+      "latency_ms": 12,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -1236,7 +1236,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 38,
+      "latency_ms": 42,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -1374,7 +1374,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 26,
+      "latency_ms": 30,
       "model": "offline rule engine",
       "source": "offline"
     }
