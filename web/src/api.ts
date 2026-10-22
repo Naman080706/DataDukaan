@@ -318,7 +318,9 @@ export const api = {
 
 export function toCSV(columns: string[], rows: Cell[][]): string {
   const esc = (v: Cell) => {
-    const s = v === null ? "" : String(v);
+    let s = v === null ? "" : String(v);
+    // Spreadsheets run cells starting with these as formulas; a leading ' keeps them as text.
+    if (typeof v === "string" && /^[=+\-@]/.test(s)) s = "'" + s;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [columns.map(esc).join(","), ...rows.map((r) => r.map(esc).join(","))].join("\n");
@@ -330,7 +332,7 @@ export function downloadCSV(name: string, columns: string[], rows: Cell[][]) {
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 0);
 }
 
 const MONEY_HINT = /(revenue|value|gbp|sales|amount|price|spend|total)/i;

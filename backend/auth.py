@@ -29,7 +29,16 @@ EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[A-Za-z]{2,}$")
 # Per-instance limits (best effort on serverless, where instances don't share memory).
 _lock = threading.Lock()
 _last_sent: dict[str, float] = {}
-_attempts: dict[str, int] = {}
+_attempts: dict[str, tuple[int, int]] = {}  # challenge payload -> (tries, expiry)
+
+
+def _prune() -> None:
+    """Drop entries that can no longer matter, so the dicts don't grow forever. Call with _lock held."""
+    now = time.time()
+    for k in [k for k, t in _last_sent.items() if now - t > RESEND_COOLDOWN_S]:
+        del _last_sent[k]
+    for k in [k for k, (_, exp) in _attempts.items() if exp < now]:
+        del _attempts[k]
 
 
 class AuthError(Exception):
@@ -87,6 +96,7 @@ def request_code(email: str) -> dict:
         raise AuthError("Enter a valid email address.")
     _secret()  # fail before sending anything if signing isn't configured
     with _lock:
+        _prune()
         wait = RESEND_COOLDOWN_S - (time.time() - _last_sent.get(email, 0))
         if wait > 0:
             raise AuthError(f"A code was just sent. You can ask for another in {int(wait) + 1} seconds.", 429)
@@ -109,9 +119,12 @@ def verify_code(challenge: str, code: str) -> dict:
         data = _unb64(payload)
     except (ValueError, json.JSONDecodeError):
         raise AuthError("That sign-in request is invalid. Ask for a new code.")
+    if not isinstance(data, dict) or not isinstance(data.get("exp"), int):
+        raise AuthError("That sign-in request is invalid. Ask for a new code.")
     with _lock:
-        tries = _attempts.get(payload, 0) + 1
-        _attempts[payload] = tries
+        _prune()
+        tries = _attempts.get(payload, (0, 0))[0] + 1
+        _attempts[payload] = (tries, data["exp"])
     if tries > MAX_ATTEMPTS:
         raise AuthError("Too many wrong codes. Ask for a new code.", 429)
     if data.get("exp", 0) < time.time():
@@ -131,11 +144,11 @@ def read_token(token: str | None) -> dict:
         raise AuthError("Sign in to use DataDukaan.", 401)
     try:
         payload, sig = token.split(".", 1)
-        data = _unb64(payload)
-    except (ValueError, json.JSONDecodeError):
+    except ValueError:
         raise AuthError("Your sign-in is invalid. Sign in again.", 401)
     if not hmac.compare_digest(sig, _sign("session", payload)):
         raise AuthError("Your sign-in is invalid. Sign in again.", 401)
+    data = _unb64(payload)  # signed by us, so it is our own JSON object
     if data.get("exp", 0) < time.time():
         raise AuthError("Your sign-in has expired. Sign in again.", 401)
     return data

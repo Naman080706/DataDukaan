@@ -45,9 +45,9 @@ HISTORY_MAX = 200
 
 
 class Turn(BaseModel):
-    role: str
-    content: str
-    sql: str | None = None
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=4000)
+    sql: str | None = Field(default=None, max_length=4000)
 
 
 class Correction(BaseModel):
@@ -68,8 +68,9 @@ class Correction(BaseModel):
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
-    conversation_id: str | None = None
-    history: list[Turn] = []
+    conversation_id: str | None = Field(default=None, max_length=100)
+    # Only the last few turns reach the prompt; the cap stops oversized (costly) requests.
+    history: list[Turn] = Field(default=[], max_length=12)
     inject_fault: bool = False
     # "auto": saved answers, then AI, then offline engine. "offline": rule engine only (outage demo).
     mode: Literal["auto", "offline"] = "auto"
@@ -155,7 +156,8 @@ class DatasetSummaryRequest(BaseModel):
 
 
 class EvalRequest(BaseModel):
-    ids: list[str] | None = None
+    # One test per request from the UI; the cap stops one call from running the whole paid suite.
+    ids: list[str] = Field(min_length=1, max_length=5)
     mode: Literal["llm", "offline"] = "llm"
     check_answers: bool = False  # also write and claim-check the answer (one more AI call per test)
 
@@ -169,7 +171,8 @@ def health():
                 "providers": [p for p, k in (("gemini", "GEMINI_API_KEY"), ("groq", "GROQ_API_KEY")) if os.environ.get(k)],
                 "email_sign_in": auth.emailjs_configured() and len(os.environ.get("AUTH_SECRET", "")) >= 32}
     except Exception as e:
-        return {"status": "degraded", "database": f"error: {e}"}
+        print(f"health check failed: {e!r}")
+        return {"status": "degraded", "database": "error"}
 
 
 @app.post("/api/auth/request-code")
@@ -205,7 +208,7 @@ def ask_endpoint(req: AskRequest, user: dict = Signed):
     qid = uuid.uuid4().hex[:12]
     result["id"] = qid
     result["conversation_id"] = req.conversation_id
-    HISTORY[qid] = result
+    HISTORY[qid] = {**result, "_owner": user["email"]}
     while len(HISTORY) > HISTORY_MAX:
         HISTORY.popitem(last=False)
     return result
@@ -271,9 +274,10 @@ def actions_endpoint(user: dict = Signed):
 
 @app.get("/api/query/{qid}")
 def get_query(qid: str, user: dict = Signed):
-    if qid not in HISTORY:
+    entry = HISTORY.get(qid)
+    if entry is None or entry["_owner"] != user["email"]:
         raise HTTPException(404, "Query not found (history is kept in memory per server instance).")
-    return HISTORY[qid]
+    return {k: v for k, v in entry.items() if k != "_owner"}
 
 
 @app.get("/api/evaluation/suite")
