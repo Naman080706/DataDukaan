@@ -5,7 +5,8 @@ __pycache__/
 .venv/
 node_modules/
 .vercel/
-data/raw/
+data/raw/*
+!data/raw/online_retail_II.xlsx
 dist/
 /.claude/
 *.tsbuildinfo

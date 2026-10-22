@@ -189,7 +189,9 @@ uvicorn api.index:app --port 8000                      # backend
 npm --prefix web install && npm --prefix web run dev   # frontend on http://localhost:5173 (proxies /api)
 ```
 
-`data/retail.duckdb` (16.5 MB) is committed. To rebuild it from source, download the [UCI workbook](https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip), unzip it into `data/raw/`, then run `python scripts/ingest.py`.
+Both the original dataset and the processed database are in the repo:
+- `data/raw/online_retail_II.xlsx` (45.6 MB): the original UCI workbook, unchanged ([source](https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip)).
+- `data/retail.duckdb` (16.5 MB): the cleaned database the app uses. Rebuild it from the workbook with `python scripts/ingest.py`.
 
 ### API
 | Endpoint | Method | Purpose |
