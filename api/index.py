@@ -19,7 +19,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request  # noqa: E4
 from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from backend import auth, db, evaluation  # noqa: E402
+from backend import actions, auth, db, evaluation, forecast  # noqa: E402
 from backend.agent import ask  # noqa: E402
 from backend.rules import AMBIGUITY_RULES, DATA_RULES, DATASET_END, DATASET_START, NON_PRODUCT_CODES  # noqa: E402
 
@@ -57,6 +57,13 @@ class AskRequest(BaseModel):
     inject_fault: bool = False
     # "auto": saved answers, then AI, then offline engine. "offline": rule engine only (outage demo).
     mode: Literal["auto", "offline"] = "auto"
+
+
+class ForecastRequest(BaseModel):
+    metric: Literal["net_revenue", "units_sold", "orders", "returned_units", "return_value"] = "net_revenue"
+    scope: Literal["total", "country", "product"] = "total"
+    key: str | None = Field(default=None, max_length=100)
+    horizon: int = Field(default=3, ge=1, le=6)
 
 
 class CodeRequest(BaseModel):
@@ -121,6 +128,30 @@ def ask_endpoint(req: AskRequest, user: dict = Signed):
     while len(HISTORY) > HISTORY_MAX:
         HISTORY.popitem(last=False)
     return result
+
+
+@app.post("/api/forecast")
+def forecast_endpoint(req: ForecastRequest, user: dict = Signed):
+    try:
+        return forecast.forecast(req.metric, req.scope, req.key, req.horizon)
+    except forecast.ForecastError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/forecast/entities")
+def forecast_entities(user: dict = Signed):
+    """Countries and the top products, for the forecast pickers."""
+    countries = db.execute_readonly_sql("SELECT country FROM transactions GROUP BY country ORDER BY SUM(line_value) DESC")["rows"]
+    products = db.execute_readonly_sql(
+        "SELECT stock_code, mode(description) FILTER (WHERE line_type = 'sale') FROM transactions WHERE line_type = 'sale' AND is_product "
+        "AND invoice_date >= '2010-12-01' GROUP BY stock_code ORDER BY SUM(line_value) DESC LIMIT 100")["rows"]
+    return {"countries": [r[0] for r in countries], "products": [{"code": r[0], "description": r[1]} for r in products],
+            "metrics": {k: {"label": v[2], "unit": v[3]} for k, v in forecast.METRICS.items()}}
+
+
+@app.get("/api/actions")
+def actions_endpoint(user: dict = Signed):
+    return actions.action_plan(limit=25)
 
 
 @app.get("/api/query/{qid}")

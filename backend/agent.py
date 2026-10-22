@@ -6,9 +6,9 @@ Plans come from, in order: saved answers, the LLM chain (Gemini, then Groq), the
 import json
 import time
 
-from . import cache, db
+from . import ahead, cache, db
 from .llm import LLMError, generate_json
-from .offline import describe_result, plan_offline
+from .offline import _known_countries, describe_result, plan_offline
 from .rules import AMBIGUITY_RULES, DATA_RULES, SCHEMA_DOC
 from .validator import ValidationError, validate_sql
 
@@ -143,6 +143,13 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     def step(tool, status, detail):
         trace.append({"tool": tool, "status": status, "detail": detail})
 
+    # Questions about the future go to the forecasting tool or the action list (no AI needed for either).
+    future = None if inject_fault else _plan_ahead(question)
+    if future:
+        trace.extend(future.pop("trace", []))
+        resp.update(future, source="tools")
+        return _finish(resp, t0)
+
     # 1-3. Understand the question; clarify or plan SQL.
     plan, source = _plan(question, history, mode, use_cache and not inject_fault, step)
     resp["source"] = source
@@ -235,6 +242,12 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
         resp["answer"] = describe_result(resp.get("title") or "Result", result["columns"], result["rows"])
         step("summarise", "ok", "answer built from the returned rows by a template (no AI)")
     return _finish(resp, t0)
+
+
+def _plan_ahead(question: str) -> dict | None:
+    if ahead.is_actions_question(question):
+        return ahead.actions_answer()
+    return ahead.forecast_answer(question, _known_countries())
 
 
 def _is_write_attempt(msg: str) -> bool:
