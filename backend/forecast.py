@@ -1,12 +1,13 @@
 """Short-horizon monthly forecasts with prediction intervals (no extra dependencies).
 
-Three small models are tried on the monthly series and the one with the lowest error in a
-rolling back-test is used:
+Four small models are tried on the monthly series and the one with the lowest error in a
+rolling back-test (every step of the horizon, not just the next month) is used:
   - seasonal: the same month last year, scaled by recent year-on-year growth
   - trend: Holt's linear exponential smoothing (level + trend)
   - average: mean of the last 3 months
-Intervals come from the chosen model's own back-test errors (relative to the forecast), widened by
-sqrt(horizon), so a model that back-tested badly gets honestly wide intervals.
+  - blend: the mean of seasonal and trend
+Intervals come from the chosen model's own back-test errors at each step ahead (relative to the forecast),
+so a model that back-tested badly gets honestly wide intervals.
 The data ends on 9 Dec 2011, so the last complete month is November 2011 and forecasts start in December 2011.
 """
 import math
@@ -34,6 +35,7 @@ MODEL_INFO = {
     "seasonal": "Same month last year, scaled by recent year-on-year growth",
     "trend": "Recent level and trend (Holt's exponential smoothing)",
     "average": "Average of the last 3 months",
+    "blend": "Average of the seasonal and trend forecasts",
 }
 
 
@@ -97,7 +99,15 @@ def _average(y: list[float], h: int) -> list[float] | None:
     return [sum(y[-3:]) / len(y[-3:])] * h
 
 
-MODELS = {"seasonal": _seasonal, "trend": _trend, "average": _average}
+def _blend(y: list[float], h: int) -> list[float] | None:
+    """Average of the seasonal and trend forecasts: combining models is usually safer than picking one."""
+    s, t = _seasonal(y, h), _trend(y, h)
+    if s is None or t is None:
+        return None
+    return [(a + b) / 2 for a, b in zip(s, t)]
+
+
+MODELS = {"seasonal": _seasonal, "trend": _trend, "average": _average, "blend": _blend}
 
 
 def cap_spikes(y: list[float]) -> tuple[list[float], float | None]:
@@ -110,22 +120,30 @@ def cap_spikes(y: list[float]) -> tuple[list[float], float | None]:
     return [min(v, cap) for v in y], cap if any(v > cap for v in y) else None
 
 
-def backtest(y: list[float]) -> dict:
-    """One-step-ahead forecasts from rolling origins over (up to) the last 12 months, for every model."""
+def backtest(y: list[float], horizon: int = 3) -> dict:
+    """Rolling-origin back-test over (up to) the last 12 months: from each origin, forecast `horizon` months ahead
+    and compare with what happened. Models are judged on every step, so one that ignores seasonality loses."""
     n = len(y)
     origins = list(range(max(13, n - 12), n)) if n >= 16 else list(range(max(3, n - 4), n))
     floor = max(sum(y) / max(n, 1) * 0.1, 1.0)
     out = {}
     for name, fn in MODELS.items():
-        preds = [fn(y[:o], 1) for o in origins]
-        if not origins or any(p is None for p in preds):
+        runs = [(o, fn(y[:o], horizon)) for o in origins]
+        if not origins or any(p is None for _, p in runs):
             continue
-        points = [(o, y[o], p[0]) for o, p in zip(origins, preds)]
-        rel = [(a - f) / max(f, floor) for _, a, f in points]
+        steps = [(o + h, h + 1, y[o + h], p[h]) for o, p in runs for h in range(horizon) if o + h < n]
+        # Spread per step ahead; with under 3 errors at a step, pool all steps (scaled by sqrt(h)), and with
+        # under 3 errors in total assume +/-100%, so thin history never gives a falsely narrow range.
+        rel = [((a - f) / max(f, floor), hh) for _, hh, a, f in steps]
+        pooled = math.sqrt(sum(e * e / hh for e, hh in rel) / len(rel)) if len(rel) >= 3 else 1.0
+        rel_sd = []
+        for h in range(1, horizon + 1):
+            errs = [e for e, hh in rel if hh == h]
+            rel_sd.append(math.sqrt(sum(e * e for e in errs) / len(errs)) if len(errs) >= 3 else max(pooled, 0.1) * math.sqrt(h))
         out[name] = {
-            "points": points,
-            "mape": sum(abs(a - f) / max(a, floor) for _, a, f in points) / len(points),
-            "rel_sd": math.sqrt(sum(e * e for e in rel) / len(rel)),
+            "points": [(t, a, f) for t, hh, a, f in steps if hh == 1],
+            "mape": sum(abs(a - f) / max(a, floor) for _, _, a, f in steps) / len(steps),
+            "rel_sd": rel_sd,
         }
     return out
 
@@ -135,21 +153,21 @@ def forecast_series(history: list[tuple[str, float]], horizon: int = 3, robust: 
     periods = [p for p, _ in history]
     raw = [float(v or 0.0) for _, v in history]
     y, cap = cap_spikes(raw) if robust else (raw, None)
-    tests = backtest(y)
+    tests = backtest(y, horizon)
     if not tests:
         raise ForecastError("Not enough history to forecast this (at least 4 months are needed).")
     name = min(tests, key=lambda k: tests[k]["mape"])
     chosen = tests[name]
     preds = MODELS[name](y, horizon)
+    spreads = [chosen["rel_sd"][i] * max(f, 1.0) for i, f in enumerate(preds)]
     points = []
-    for i, (period, f) in enumerate(zip(next_months(periods[-1], horizon), preds)):
-        spread = chosen["rel_sd"] * math.sqrt(i + 1) * max(f, 1.0)
+    for period, f, spread in zip(next_months(periods[-1], horizon), preds, spreads):
         points.append({"period": period, "value": round(f, 2),
                        "lo80": round(max(f - Z80 * spread, 0.0), 2), "hi80": round(f + Z80 * spread, 2),
                        "lo95": round(max(f - Z95 * spread, 0.0), 2), "hi95": round(f + Z95 * spread, 2)})
     # Horizon total: errors are treated as independent month to month (an approximation, stated in the notes).
     total = sum(p["value"] for p in points)
-    total_spread = math.sqrt(sum((chosen["rel_sd"] * math.sqrt(i + 1) * max(p["value"], 1.0)) ** 2 for i, p in enumerate(points)))
+    total_spread = math.sqrt(sum(sp ** 2 for sp in spreads))
     return {
         "history": [{"period": p, "value": round(v, 2)} for p, v in zip(periods, raw)],
         "forecast": points,
@@ -157,7 +175,7 @@ def forecast_series(history: list[tuple[str, float]], horizon: int = 3, robust: 
         "model": {"name": name, "description": MODEL_INFO[name]},
         "backtest": {
             "mape": round(chosen["mape"], 4),
-            "points": [{"period": periods[o], "actual": round(raw[o], 2), "predicted": round(f, 2)} for o, _, f in chosen["points"]],
+            "points": [{"period": periods[t], "actual": round(raw[t], 2), "predicted": round(f, 2)} for t, _, f in chosen["points"]],
             "models": [{"name": k, "description": MODEL_INFO[k], "mape": round(v["mape"], 4)} for k, v in sorted(tests.items(), key=lambda kv: kv[1]["mape"])],
         },
         "capped": [{"period": p, "value": round(v, 2)} for p, v in zip(periods, raw) if cap is not None and v > cap],
@@ -228,7 +246,7 @@ def forecast(metric: str = "net_revenue", scope: str = "total", key: str | None 
     _, _, metric_label, unit = METRICS[metric]
     notes = [
         "The data ends on 9 December 2011, so the forecast starts with December 2011 and is based on months up to November 2011.",
-        f"Model chosen by testing each one on the past {len(result['backtest']['points'])} months: "
+        f"Model chosen by testing each one on the past {len(result['backtest']['points'])} months, up to {horizon} months ahead: "
         f"{MODEL_INFO[result['model']['name']].lower()}. Typical error in those tests: {result['backtest']['mape']:.0%}.",
         "The ranges show where the real figure should fall 80% and 95% of the time, judged by how wrong the model was in those tests.",
     ]
@@ -263,7 +281,7 @@ def parse_question(question: str, countries: list[str]) -> dict | None:
     m = re.search(r"\bnext (\d+) months\b", q)
     horizon = int(m.group(1)) if m else 3 if re.search(r"\b(quarter|90 days|3 months|three months)\b", q) else \
         1 if re.search(r"\b(next month|30 days|coming month)\b", q) else 3
-    code = re.search(r"b(d{5}[a-zA-Z]{0,2})b", question)
+    code = re.search(r"\b(\d{5}[a-zA-Z]{0,2})\b", question)
     country = next((c for c in countries if re.search(r"\b" + re.escape(c.lower()) + r"\b", q)), None)
     scope, key = ("product", code.group(1)) if code else ("country", country) if country else ("total", None)
     return {"metric": metric, "scope": scope, "key": key, "horizon": min(horizon, 6)}
