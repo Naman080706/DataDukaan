@@ -180,8 +180,11 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
             step("validate_sql", "ok", "single read-only SELECT on allowed tables")
         except ValidationError as e:
             step("validate_sql", "blocked", str(e))
-            if attempt == MAX_RETRIES or _is_write_attempt(str(e)):
+            if _is_write_attempt(str(e)):
                 resp.update(status="blocked", sql=sql, answer="This was blocked for safety: DataDukaan can only look at the sales records, never change them.")
+                return _finish(resp, t0)
+            if attempt == MAX_RETRIES:
+                resp.update(sql=sql, answer=f"DataDukaan couldn't work this out after {MAX_RETRIES + 1} tries. Try asking it a different way.")
                 return _finish(resp, t0)
             sql = _fix(sql, f"Validator rejected the query: {e}", question, step)
             if sql is None:
