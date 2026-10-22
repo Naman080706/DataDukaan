@@ -28,7 +28,7 @@ export default function ResultView({ r }: { r: AskResponse }) {
         ))}
         <span className="ml-auto pb-2 text-[13px] text-muted">
           {r.rows.length} {r.rows.length === 1 ? "result" : "results"}
-          {r.truncated ? " (first 500 shown)" : ""}, answered in {(r.latency_ms / 1000).toFixed(1)} s
+          {r.truncated ? " (first 500 shown)" : ""}, answered in {r.latency_ms < 100 ? "under 0.1" : (r.latency_ms / 1000).toFixed(1)} s
         </span>
       </div>
       <div className="pt-4">

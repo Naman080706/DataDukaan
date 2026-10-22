@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 
 const RULES: { term: string; body: string }[] = [
-  { term: "Cancelled invoices", body: "Invoice numbers starting with C are cancellations or credit notes. They never count as sales and are counted separately when you ask about them. “Revenue excluding cancelled invoices” means sale lines only." },
-  { term: "Returns", body: "Returned items sit on C invoices with a negative quantity. Net revenue is sales minus these returns. “Returned most” ranks products by units; “returned most often” ranks them by the number of return invoices." },
-  { term: "Customers without an ID", body: "About one line in five has no customer ID. Those lines stay in totals such as revenue by country, but are left out of customer rankings and customer counts, and the answer says so." },
-  { term: "Things that aren't products", body: "Postage, manual adjustments, bank charges, Amazon fees, samples, discounts, test codes and gift vouchers are left out of product rankings and kept in transaction totals." },
-  { term: "Stock write-offs and bad debt", body: "Negative quantities without a C invoice are damaged or lost stock at £0. Invoices starting with A are bad-debt adjustments. Neither is a sale or a return." },
-  { term: "Money", body: "Line value is quantity times unit price, in pounds sterling, rounded to the penny." },
+  { term: "Cancelled orders", body: "Invoice numbers starting with C are cancellations. They never count as sales, and are counted separately when you ask about them. “Revenue excluding cancelled invoices” means sales only." },
+  { term: "Returns", body: "Returned items are recorded on those C invoices. Net revenue is sales minus returns. “Returned most” ranks products by how many items came back; “returned most often” ranks them by how many separate returns there were." },
+  { term: "Customers without an ID", body: "About one sale in five has no customer ID. Those sales still count towards totals such as revenue by country, but are left out of customer rankings and customer counts, and the answer says so." },
+  { term: "Things that aren't products", body: "Postage, bank charges, Amazon fees, samples, discounts, gift vouchers and manual adjustments are left out of product rankings, but still count towards overall totals." },
+  { term: "Stock write-offs and bad debt", body: "Items written off as damaged or lost, and invoices starting with A (bad-debt adjustments), are neither sales nor returns." },
+  { term: "Money", body: "Each item's value is the number sold times its price, in pounds sterling, rounded to the penny." },
   { term: "Dates", body: "Years are calendar years. The data ends on 9 December 2011, part-way through a quarter, so “last quarter” could mean July to September (the last complete quarter) or October to 9 December. DataDukaan asks which one you mean; “last month” works the same way." },
-  { term: "Vague questions", body: "If the answer depends on a measure you didn't name, such as “best customers” or “top products”, DataDukaan asks which one you mean instead of picking for you." },
+  { term: "Vague questions", body: "If the answer depends on something you didn't say, such as whether “best customers” means most money spent or most orders, DataDukaan asks instead of picking for you." },
   { term: "Safety", body: "DataDukaan can only look at the sales records. Every calculation is checked before it runs, and anything that would change, delete or copy the records is refused." },
 ];
 
