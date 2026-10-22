@@ -120,8 +120,8 @@ The AI agent and the offline engine are scored separately (the Trap tests page h
 
 The chart is drawn from the saved runs by `python scripts/make_chart.py`. Each bar splits passes into correct answers, rightly asked back and rightly refused, with failures in red.
 
-- **Gemini run:** the main Gemini models were rate-limited, so every answer came from `gemini-3.5-flash-lite`. An earlier Gemini run scored 14/15: its only failure was T09, and it failed because every Gemini model returned a quota error, not because of wrong SQL. That failure led to the fallback chain.
-- **Full-chain run:** in the full-chain run, Gemini's main models were rate-limited, so answers came from `gemini-3.5-flash-lite` and Groq's `gpt-oss-120b`.
+- **Gemini run:** rate limits spread the run across four Gemini models (`gemini-3.5-flash`, `gemini-2.5-flash`, `gemini-flash-latest`, `gemini-3.5-flash-lite`); each test records which one answered. An earlier Gemini run scored 14/15: its only failure was T09, and it failed because every Gemini model returned a quota error, not because of wrong SQL. That failure led to the fallback chain.
+- **Full-chain run:** Gemini's main models were rate-limited, so every answer came from `gemini-3.5-flash-lite`. In an earlier full-chain run, some questions went on to Groq's `gpt-oss-120b`.
 - **Groq run:** Groq's own rate limits moved the run across `gpt-oss-120b`, `qwen3.8-27b` and `gpt-oss-20b` (each test records which model answered), so the 15/15 covers that mix of models.
 - **Offline engine caveat:** we wrote it with these 15 questions in view, so its 15/15 shows it covers them, not that it handles any wording.
 

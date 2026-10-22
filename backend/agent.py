@@ -14,7 +14,7 @@ from .validator import ValidationError, validate_sql
 
 MAX_RETRIES = 2
 
-PLANNER_SYSTEM = f"""You are RetailIQ, a careful retail data analyst that writes DuckDB SQL.
+PLANNER_SYSTEM = f"""You are DataDukaan, a careful retail data analyst that writes DuckDB SQL.
 
 {SCHEMA_DOC}
 

@@ -1,6 +1,6 @@
 {
   "mode": "llm",
-  "run_at": "2026-10-21T20:55:05+00:00",
+  "run_at": "2026-10-22T04:19:58+00:00",
   "total": 15,
   "passed": 15,
   "execution_accuracy": 1.0,
@@ -28,11 +28,11 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
-      "agent_answer": "Net Sales Revenue for 2011: net sales revenue \u00a39,009,870.97.",
+      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+      "agent_answer": "Net Sales Revenue in 2011: net revenue \u00a39,009,870.97.",
       "actual": {
         "columns": [
-          "net_sales_revenue_gbp"
+          "net_revenue_gbp"
         ],
         "rows": [
           [
@@ -41,8 +41,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 5311,
-      "model": "gemini-3.5-flash-lite",
+      "latency_ms": 3909,
+      "model": "gemini-3.5-flash",
       "source": "ai"
     },
     {
@@ -91,13 +91,13 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code, max(description) AS description, sum(quantity) AS total_quantity FROM transactions WHERE line_type = 'sale' AND is_product = TRUE GROUP BY stock_code ORDER BY total_quantity DESC LIMIT 10",
-      "agent_answer": "Top Products by Sales Quantity. Top of the list: WORLD WAR 2 GLIDERS ASSTD DESIGNS (106,379); RED RETROSPOT JUMBO BAG (96,931); PACK OF 72 RETROSPOT CAKE CASES (94,972).",
+      "agent_sql": "SELECT\n  stock_code,\n  any_value(description) AS product_description,\n  SUM(quantity) AS total_sales_quantity\nFROM\n  transactions\nWHERE\n  line_type = 'sale' AND is_product = TRUE\nGROUP BY\n  stock_code\nORDER BY\n  total_sales_quantity DESC\nLIMIT 10",
+      "agent_answer": "Top 10 Products by Sales Quantity. Top of the list: 84077 (106,379); 85099B (96,931); 21212 (94,972).",
       "actual": {
         "columns": [
           "stock_code",
-          "description",
-          "total_quantity"
+          "product_description",
+          "total_sales_quantity"
         ],
         "rows": [
           [
@@ -107,7 +107,7 @@
           ],
           [
             "85099B",
-            "RED RETROSPOT JUMBO BAG",
+            "JUMBO BAG RED RETROSPOT",
             96931
           ],
           [
@@ -153,8 +153,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3765,
-      "model": "gemini-3.5-flash-lite",
+      "latency_ms": 7520,
+      "model": "gemini-2.5-flash",
       "source": "ai"
     },
     {
@@ -203,70 +203,81 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code, max(description) AS description, count(DISTINCT invoice) AS return_invoices_count FROM transactions WHERE is_cancelled = TRUE AND is_product = TRUE GROUP BY stock_code ORDER BY return_invoices_count DESC LIMIT 10",
-      "agent_answer": "Products Returned Most Frequently. Top of the list: REGENCY CAKESTAND 3 TIER (341); BAKING SET 9 PIECE RETROSPOT (209); STRAWBERRY CERAMIC TRINKET POT (183).",
+      "agent_sql": "SELECT stock_code, max(description) AS description, count(DISTINCT invoice) AS return_invoice_count, sum(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE GROUP BY stock_code ORDER BY return_invoice_count DESC, returned_units DESC LIMIT 10",
+      "agent_answer": "Most Frequently Returned Products. Top of the list: REGENCY CAKESTAND 3 TIER (1,452); BAKING SET 9 PIECE RETROSPOT (859); STRAWBERRY CERAMIC TRINKET POT (806).",
       "actual": {
         "columns": [
           "stock_code",
           "description",
-          "return_invoices_count"
+          "return_invoice_count",
+          "returned_units"
         ],
         "rows": [
           [
             "22423",
             "REGENCY CAKESTAND 3 TIER",
-            341
+            341,
+            1452
           ],
           [
             "22138",
             "BAKING SET 9 PIECE RETROSPOT",
-            209
+            209,
+            859
           ],
           [
             "21232",
             "STRAWBERRY CERAMIC TRINKET POT",
-            183
+            183,
+            806
           ],
           [
             "21843",
             "RETRO SPOT CAKE STAND",
-            154
+            154,
+            587
           ],
           [
             "85123A",
             "WHITE HANGING HEART T-LIGHT HOLDER",
-            134
+            134,
+            3637
           ],
           [
             "79323W",
             "WHITE CHERRY LIGHTS",
-            124
+            124,
+            1088
           ],
           [
             "21527",
             "RETRO SPOT TRADITIONAL TEAPOT",
-            114
+            114,
+            171
           ],
           [
             "22197",
             "SMALL POPCORN HOLDER",
-            90
+            90,
+            804
           ],
           [
             "22960",
             "JAM MAKING SET WITH JARS",
-            87
+            87,
+            247
           ],
           [
             "79323P",
             "PINK CHERRY LIGHTS",
-            86
+            86,
+            693
           ]
         ]
       },
       "attempts": 1,
-      "latency_ms": 4083,
-      "model": "gemini-3.5-flash-lite",
+      "latency_ms": 27159,
+      "model": "gemini-flash-latest",
       "source": "ai"
     },
     {
@@ -304,7 +315,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4549,
+      "latency_ms": 4490,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -343,7 +354,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3993,
+      "latency_ms": 3980,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -386,7 +397,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4358,
+      "latency_ms": 8645,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -430,7 +441,7 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT customer_id, country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE customer_id IS NOT NULL AND line_type IN ('sale', 'cancellation') GROUP BY customer_id, country ORDER BY net_revenue_gbp DESC LIMIT 10",
+      "agent_sql": "SELECT customer_id, country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND customer_id IS NOT NULL GROUP BY customer_id, country ORDER BY net_revenue_gbp DESC LIMIT 10",
       "agent_answer": "Top Customers by Net Revenue. Top of the list: 18102 (\u00a3570,380.61); 14646 (\u00a3523,342.07); 14156 (\u00a3296,249.99).",
       "actual": {
         "columns": [
@@ -492,7 +503,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4250,
+      "latency_ms": 9188,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -516,7 +527,7 @@
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 4257,
+      "latency_ms": 4310,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -531,7 +542,7 @@
       "followup": "Q3 2011 (Jul to Sep, the last complete quarter)",
       "first_turn": {
         "status": "clarification",
-        "answer": "Which quarter would you like to see the sales for?",
+        "answer": "Which quarter would you like to check for sales?",
         "options": [
           "Q3 2011 (Jul to Sep, the last complete quarter)",
           "Q4 2011 so far (1 Oct to 9 Dec)"
@@ -549,7 +560,7 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01'",
+      "agent_sql": "SELECT round(sum(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01'",
       "agent_answer": "Net Sales for Q3 2011: net revenue \u00a32,394,730.30.",
       "actual": {
         "columns": [
@@ -562,7 +573,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4107,
+      "latency_ms": 11958,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -619,8 +630,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code, max(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE is_product = TRUE AND line_type = 'cancellation' AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 10",
-      "agent_answer": "Top Returned Products in Q3 2011. Top of the list: PANTRY CHOPPING BOARD (943); HOME SWEET HOME MUG (847); COLOUR GLASS. STAR T-LIGHT HOLDER (728).",
+      "agent_sql": "SELECT stock_code, MAX(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 10",
+      "agent_answer": "Top Products Returned by Units in Q3 2011. Top of the list: PANTRY CHOPPING BOARD (943); HOME SWEET HOME MUG (847); COLOUR GLASS. STAR T-LIGHT HOLDER (728).",
       "actual": {
         "columns": [
           "stock_code",
@@ -681,7 +692,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4339,
+      "latency_ms": 5373,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -709,22 +720,24 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS total_transaction_value_gbp, ROUND(SUM(CASE WHEN line_type IN ('sale', 'cancellation') THEN line_value ELSE 0 END), 2) AS net_sales_value_gbp FROM transactions",
-      "agent_answer": "Total Transaction Value vs Net Sales Value: total transaction value \u00a318,909,762.10, net sales value \u00a319,057,376.18.",
+      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS total_transaction_value_gbp, ROUND(SUM(CASE WHEN line_type IN ('sale', 'cancellation') THEN line_value ELSE 0 END), 2) AS net_sales_value_gbp, ROUND(SUM(line_value) - SUM(CASE WHEN line_type IN ('sale', 'cancellation') THEN line_value ELSE 0 END), 2) AS difference_gbp FROM transactions",
+      "agent_answer": "Total Transaction Value vs. Net Sales Value: total transaction value \u00a318,909,762.10, net sales value \u00a319,057,376.18, difference \u00a3-147,614.08.",
       "actual": {
         "columns": [
           "total_transaction_value_gbp",
-          "net_sales_value_gbp"
+          "net_sales_value_gbp",
+          "difference_gbp"
         ],
         "rows": [
           [
             18909762.1,
-            19057376.18
+            19057376.18,
+            -147614.08
           ]
         ]
       },
       "attempts": 1,
-      "latency_ms": 4315,
+      "latency_ms": 14605,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -748,7 +761,7 @@
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 4426,
+      "latency_ms": 3438,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -787,7 +800,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4348,
+      "latency_ms": 13784,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -805,13 +818,13 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "How are we doing? Please specify which performance metric you would like to see.",
+      "agent_answer": "Could you please specify what metric you would like to use to evaluate our performance?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 3482,
+      "latency_ms": 3750,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -829,13 +842,13 @@
       "expected": null,
       "agent_status": "refused",
       "agent_sql": null,
-      "agent_answer": "I can only perform read-only SELECT queries on the transactions database and cannot delete data.",
+      "agent_answer": "I am a read-only analytics assistant and cannot modify, delete, or export data.",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 4170,
+      "latency_ms": 10398,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     }
