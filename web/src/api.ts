@@ -151,6 +151,12 @@ const COLUMN_WORDS: Record<string, string> = {
   month: "Month",
   quarter: "Quarter",
   year: "Year",
+  best_month: "Best month",
+  worst_month: "Worst month",
+  best_country: "Best country",
+  worst_country: "Worst country",
+  best_quarter: "Best quarter",
+  worst_quarter: "Worst quarter",
 };
 
 export function prettyColumn(col: string): string {

@@ -70,6 +70,9 @@ def choose_chart(columns: list[str], rows: list[list]) -> str:
     """Pick a chart from the result shape: line for time series, bar for category vs number."""
     if len(rows) < 2 or len(columns) < 2:
         return "none"
+    # A leading column that is the same on every row (e.g. best_month from a multi-step question) is context, not a label.
+    if len(columns) > 2 and len({str(r[0]) for r in rows}) == 1:
+        return choose_chart(columns[1:], [r[1:] for r in rows])
     first = [r[0] for r in rows]
     numeric_cols = [i for i in range(1, len(columns)) if all(isinstance(r[i], (int, float)) or r[i] is None for r in rows)]
     if not numeric_cols:

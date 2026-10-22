@@ -35,7 +35,7 @@ MONTHS = {m: i for i, m in enumerate(
     ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"], 1)}
 WRITE_WORDS = re.compile(r"\b(delete|drop|update|insert|truncate|alter|remove|modify|overwrite)\b")
 # Time phrases the engine does not define; it declines rather than answer for the wrong period.
-UNSUPPORTED_TIME = re.compile(r"\b(last year|this year|this month|this quarter|yesterday|today|last week|this week|ytd)\b")
+UNSUPPORTED_TIME = re.compile(r"\b(this month|this quarter|yesterday|today|last week|this week|ytd)\b")
 METRIC_WORDS = re.compile(r"\b(revenue|sales|sold|spend|spent|turnover|value|units|quantity|orders|invoices|purchases|returned|returns)\b")
 
 _countries: list[str] | None = None
@@ -70,6 +70,79 @@ def _clarify(question: str, options: list[str]) -> dict:
     return {"action": "clarify", "question": question, "options": options}
 
 
+
+# --- Multi-step questions: "top products in the best month of 2011", "in the country with the highest revenue
+# outside the UK, ...", "which month had the most returns, and what were the most returned products that month?".
+# The inner question is answered first (shown to the user), then used as a filter on the main question.
+_SUP_HIGH = {"best", "top", "highest", "biggest", "strongest", "most", "largest"}
+_XUK = r"(?P<xuk>\s+(?:outside|excluding|other than|apart from)\s+(?:the\s+)?(?:uk|united kingdom))?"
+_YEAR = r"(?:\s+(?:of|in|for)\s+(?:the\s+year\s+)?(?P<year>2009|2010|2011))?"
+_NESTED = [
+    re.compile(r"\b(?:in|for|during|from|of)\s+(?:the\s+)?(?P<sup>best|top|highest|biggest|strongest|worst|lowest|weakest)"
+               r"(?:[\s-]+(?:selling|sales|revenue|performing))?\s+(?P<kind>month|quarter|country)\b" + _YEAR + _XUK),
+    re.compile(r"\b(?:in|for|during|from)\s+the\s+(?P<kind>month|quarter|country)\s+(?:of\s+(?P<year0>2009|2010|2011)\s+)?"
+               r"with\s+the\s+(?P<sup>highest|most|biggest|largest|lowest|least|fewest)\s+"
+               r"(?P<what>net revenue|revenue|sales|returns|returned units|orders)" + _XUK + _YEAR),
+]
+_TWO_CLAUSE = re.compile(
+    r"^(?:which|what)\s+(?P<kind>month|quarter|country)\s+(?:(?:of|in)\s+)?(?:(?P<year>2009|2010|2011)\s+)?"
+    r"(?:had|saw|got|has|did)\s+(?:the\s+)?(?P<sup>most|highest|biggest|fewest|least|lowest|best|worst)\s+"
+    r"(?P<what>returns|returned units|net revenue|revenue|sales|orders)\b.*?(?:,\s*and|\s+and|,)\s+(?P<rest>.+)$")
+_KIND = {
+    "month": ("date_trunc('month', invoice_date)", "strftime(k, '%Y-%m')"),
+    "quarter": ("date_trunc('quarter', invoice_date)", "concat(year(k), '-Q', quarter(k))"),
+    "country": ("country", "k"),
+}
+
+
+def _extract_pick(q: str) -> tuple[str, dict | None]:
+    """Find an inner "best/worst month|quarter|country" step; return the question without it, and the step."""
+    m = _TWO_CLAUSE.match(q)
+    rest = None
+    if m:
+        rest = re.sub(r"\b(?:in\s+|for\s+|during\s+)?that\s+(?:month|quarter|country)\b", "", m.group("rest")).strip()
+    else:
+        m = next((x for p in _NESTED for x in [p.search(q)] if x), None)
+        if not m:
+            return q, None
+    g = m.groupdict()
+    kind, sup, what = g["kind"], g["sup"], (g.get("what") or "net revenue")
+    year = g.get("year") or g.get("year0")
+    remaining = rest if rest is not None else (q[:m.start()] + " " + q[m.end():])
+    if not year:
+        years = re.findall(r"\b(2009|2010|2011)\b", q)
+        year = years[-1] if years else None
+    if "return" in what:
+        expr, base, measure_label = "SUM(-quantity)", "line_type = 'cancellation'", "units returned"
+    elif what == "orders":
+        expr, base, measure_label = "COUNT(DISTINCT invoice)", "line_type = 'sale'", "orders"
+    else:
+        expr, base, measure_label = "SUM(line_value)", "line_type IN ('sale', 'cancellation')", "net revenue"
+    where = [base]
+    if year:
+        where.append(f"invoice_date >= '{year}-01-01' AND invoice_date < '{int(year) + 1}-01-01'")
+    if g.get("xuk"):
+        where.append("country <> 'United Kingdom'")
+    key, label = _KIND[kind]
+    direction = "DESC" if sup in _SUP_HIGH else "ASC"
+    inner = f"SELECT {key} AS k FROM transactions WHERE {' AND '.join(where)} GROUP BY 1 ORDER BY {expr} {direction} LIMIT 1"
+    picked = db.execute_readonly_sql(f"SELECT {label} AS v FROM ({inner})")["rows"]
+    value = picked[0][0] if picked else None
+    shown = value
+    if kind == "month" and value:
+        y, mo = str(value).split("-")
+        shown = f"{list(MONTHS)[int(mo) - 1].title()} {y}"
+    word = "highest" if direction == "DESC" else "lowest"
+    scope = f" of {year}" if year else ""
+    scope += " outside the UK" if g.get("xuk") else ""
+    return remaining, {
+        "kind": kind, "key": key, "label": label, "inner": inner, "year": year, "value": value,
+        "column": f"{'best' if direction == 'DESC' else 'worst'}_{kind}",
+        "step1": f"The {kind}{scope} with the {word} {measure_label} was {shown}.",
+        "title": f" in {shown}",
+    }
+
+
 def plan_offline(question: str, history: list[dict] | None = None) -> dict | None:
     """Return a planner-shaped dict (action sql/clarify/refuse) or None if not understood."""
     q = _merge_followup(question, history or [])
@@ -85,6 +158,23 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
     assumptions: list[str] = []
     filters: list[str] = []
     period_label = ""
+
+    # "This year" / "last year" are relative to the end of the data, not today.
+    if re.search(r"\bthis year\b", q):
+        q = re.sub(r"\bthis year\b", "2011", q)
+        assumptions.append("This year means 2011, the latest year in the data; it ends on 9 December 2011.")
+    if re.search(r"\blast year\b", q):
+        q = re.sub(r"\blast year\b", "2010", q)
+        assumptions.append("Last year means 2010, the year before the latest year in the data.")
+
+    q, pick = _extract_pick(q)
+    if pick:
+        if pick["value"] is None:
+            return None
+        assumptions.append(f"Step 1: {pick['step1']} Step 2 uses only that {pick['kind']}.")
+        filters.append(f"{pick['key']} = (SELECT k FROM pick)")
+        if pick["kind"] == "country" and pick["year"] and not re.search(r"\b(2009|2010|2011)\b", q):
+            q += f" {pick['year']}"
 
     # Period: an explicit quarter/month/year wins; the last mention wins, so follow-ups can override.
     mq = re.findall(r"\bq([1-4])\s*(?:of\s*)?(2009|2010|2011)\b", q)
@@ -188,7 +278,7 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
     if dim is None:
         sql = f"SELECT {expr} AS {alias} FROM transactions WHERE {' AND '.join(where)}"
         title = f"{label[0].upper()}{label[1:]}{period_label}{' for ' + country if country else ''}"
-        return {"action": "sql", "sql": sql, "assumptions": assumptions, "title": title}
+        return _with_pick({"action": "sql", "sql": sql, "assumptions": assumptions, "title": title}, pick)
 
     sel, group, dim_filter, is_time = DIMENSIONS[dim]
     if dim_filter:
@@ -208,7 +298,18 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
     sql = (f"SELECT {sel}, {expr} AS {alias} FROM transactions WHERE {' AND '.join(where)} "
            f"GROUP BY {group} ORDER BY {order} LIMIT {limit}")
     title = f"{label[0].upper()}{label[1:]} by {dim}{period_label}{' for ' + country if country else ''}"
-    return {"action": "sql", "sql": sql, "assumptions": assumptions, "title": title}
+    return _with_pick({"action": "sql", "sql": sql, "assumptions": assumptions, "title": title}, pick)
+
+
+def _with_pick(plan: dict, pick: dict | None) -> dict:
+    """Put the inner step in front of the main query as a WITH step, and show which month/country it chose."""
+    if not pick:
+        return plan
+    sql = plan["sql"].replace("SELECT ", f"SELECT (SELECT {pick['label']} FROM pick) AS {pick['column']}, ", 1)
+    plan["sql"] = f"WITH pick AS ({pick['inner']}) {sql}"
+    plan["title"] += pick["title"]
+    plan["steps"] = [pick["step1"], "Answer the main question within it"]
+    return plan
 
 
 def _fmt(col: str, v) -> str:
@@ -227,7 +328,9 @@ def describe_result(title: str, columns: list[str], rows: list[list]) -> str:
         parts = [f"{c.replace('_', ' ').replace(' gbp', '')} {_fmt(c, v)}" for c, v in zip(columns, rows[0])]
         return f"{title}: " + ", ".join(parts) + "."
     vi = next((i for i in range(len(columns) - 1, 0, -1) if isinstance(rows[0][i], (int, float))), len(columns) - 1)
-    li = columns.index("description") if "description" in columns else 0
+    # Label each row by its description, else by the first column that isn't a constant "best_month"-style step result.
+    li = columns.index("description") if "description" in columns else next(
+        (i for i, c in enumerate(columns) if not c.startswith(("best_", "worst_"))), 0)
     name = lambda r: str(r[li] if r[li] is not None else r[0])  # noqa: E731
     if columns[0] in ("month", "quarter", "year"):
         hi = max(rows, key=lambda r: r[vi] or 0)

@@ -105,15 +105,17 @@ function AutoChart({ r }: { r: AskResponse }) {
   if (valueIdx < 0) return null;
   const valueCol = r.columns[valueIdx];
   const descIdx = r.columns.findIndex((c) => /description|name/i.test(c));
+  // Skip leading columns that are the same on every row (e.g. "best month" from a multi-step question).
+  const labelIdx = Math.max(0, r.columns.findIndex((_, i) => i < valueIdx && new Set(r.rows.map((row) => String(row[i]))).size > 1));
   const useDesc = descIdx > 0 && r.chart_type === "bar";
-  const data = r.rows.map((row) => ({ label: String(useDesc ? row[descIdx] ?? row[0] : row[0]).slice(0, 30), value: row[valueIdx] as number }));
+  const data = r.rows.map((row) => ({ label: String(useDesc ? row[descIdx] ?? row[labelIdx] : row[labelIdx]).slice(0, 30), value: row[valueIdx] as number }));
   const fmt = (v: number) => formatCell(valueCol, v);
   const compact = (v: number) => Intl.NumberFormat("en-GB", { notation: "compact" }).format(v);
   const axis = { fontSize: 12, fill: "#6B6F66", fontFamily: "Archivo" };
   return (
     <figure>
       <figcaption className="mb-2 text-[13px] text-muted">
-        {prettyColumn(valueCol)} by {prettyColumn(useDesc ? r.columns[descIdx] : r.columns[0]).toLowerCase()}
+        {prettyColumn(valueCol)} by {prettyColumn(useDesc ? r.columns[descIdx] : r.columns[labelIdx]).toLowerCase()}
       </figcaption>
       <ResponsiveContainer width="100%" height={Math.max(240, r.chart_type === "bar" ? data.length * 30 + 40 : 300)}>
         {r.chart_type === "line" ? (
@@ -162,6 +164,7 @@ export function SqlInspector({ sql, note = true }: { sql: string; note?: boolean
 
 const STEP_LABEL: Record<string, string> = {
   get_schema: "Read the counting rules",
+  plan_steps: "Broke the question into smaller steps",
   generate_sql: "Worked out how to calculate it",
   inject_fault: "Demo: broke the calculation on purpose",
   validate_sql: "Checked it only reads the records, never changes them",

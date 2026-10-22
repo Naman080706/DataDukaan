@@ -1,8 +1,8 @@
 {
   "mode": "offline",
-  "run_at": "2026-10-22T05:55:29+00:00",
-  "total": 15,
-  "passed": 15,
+  "run_at": "2026-10-22T06:54:49+00:00",
+  "total": 18,
+  "passed": 18,
   "execution_accuracy": 1.0,
   "clarification_rate": 1.0,
   "results": [
@@ -41,7 +41,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 61,
+      "latency_ms": 38,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -85,7 +85,7 @@
           ],
           [
             "22197",
-            "SMALL POPCORN HOLDER",
+            "POPCORN HOLDER",
             88537
           ]
         ]
@@ -153,7 +153,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 23,
+      "latency_ms": 15,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -244,7 +244,7 @@
           ],
           [
             "21527",
-            "RED RETROSPOT TRADITIONAL TEAPOT",
+            "RETRO SPOT TRADITIONAL TEAPOT",
             114
           ],
           [
@@ -265,7 +265,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 30,
+      "latency_ms": 20,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -304,7 +304,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 8,
+      "latency_ms": 6,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -343,7 +343,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 5,
+      "latency_ms": 3,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -422,7 +422,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 16,
+      "latency_ms": 12,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -517,7 +517,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 18,
+      "latency_ms": 12,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -587,7 +587,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 8,
+      "latency_ms": 5,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -706,7 +706,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 12,
+      "latency_ms": 9,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -749,7 +749,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 6,
+      "latency_ms": 5,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -812,7 +812,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 8,
+      "latency_ms": 6,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -861,6 +861,293 @@
       },
       "attempts": 0,
       "latency_ms": 0,
+      "model": "offline rule engine",
+      "source": "offline"
+    },
+    {
+      "id": "T16",
+      "question": "What were the top 5 products by revenue in the best sales month of this year?",
+      "category": "multi-step",
+      "check": "top_k",
+      "challenge": "Two steps: find 2011's best month by net revenue (November 2011), then rank products within it. \"This year\" means 2011, the latest year in the data.",
+      "passed": true,
+      "reason": "top 5 match: ['23084', '22086', '85123A', '22197', '22910']",
+      "followup": null,
+      "first_turn": null,
+      "reference_sql": "WITH best_month AS (SELECT date_trunc('month', invoice_date) AS m FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY SUM(line_value) DESC LIMIT 1) SELECT stock_code, any_value(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND is_product AND date_trunc('month', invoice_date) = (SELECT m FROM best_month) GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5",
+      "expected": {
+        "columns": [
+          "stock_code",
+          "description",
+          "net_revenue_gbp"
+        ],
+        "rows": [
+          [
+            "23084",
+            "RABBIT NIGHT LIGHT",
+            34422.09
+          ],
+          [
+            "22086",
+            "PAPER CHAIN KIT 50'S CHRISTMAS",
+            28883.04
+          ],
+          [
+            "85123A",
+            "WHITE HANGING HEART T-LIGHT HOLDER",
+            14119.8
+          ],
+          [
+            "22197",
+            "POPCORN HOLDER",
+            13968.74
+          ],
+          [
+            "22910",
+            "PAPER CHAIN KIT VINTAGE CHRISTMAS",
+            12831.54
+          ]
+        ]
+      },
+      "agent_status": "success",
+      "agent_sql": "WITH pick AS (SELECT date_trunc('month', invoice_date) AS k FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY SUM(line_value) DESC LIMIT 1) SELECT (SELECT strftime(k, '%Y-%m') FROM pick) AS best_month, stock_code, any_value(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND date_trunc('month', invoice_date) = (SELECT k FROM pick) AND is_product GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5",
+      "agent_answer": "Net revenue (sales minus returns) by product in November 2011. Top of the list: RABBIT NIGHT LIGHT (\u00a334,422.09); PAPER CHAIN KIT 50'S CHRISTMAS (\u00a328,883.04); WHITE HANGING HEART T-LIGHT HOLDER (\u00a314,119.80).",
+      "actual": {
+        "columns": [
+          "best_month",
+          "stock_code",
+          "description",
+          "net_revenue_gbp"
+        ],
+        "rows": [
+          [
+            "2011-11",
+            "23084",
+            "RABBIT NIGHT LIGHT",
+            34422.09
+          ],
+          [
+            "2011-11",
+            "22086",
+            "PAPER CHAIN KIT 50'S CHRISTMAS",
+            28883.04
+          ],
+          [
+            "2011-11",
+            "85123A",
+            "WHITE HANGING HEART T-LIGHT HOLDER",
+            14119.8
+          ],
+          [
+            "2011-11",
+            "22197",
+            "POPCORN HOLDER",
+            13968.74
+          ],
+          [
+            "2011-11",
+            "22910",
+            "PAPER CHAIN KIT VINTAGE CHRISTMAS",
+            12831.54
+          ]
+        ]
+      },
+      "attempts": 1,
+      "latency_ms": 44,
+      "model": "offline rule engine",
+      "source": "offline"
+    },
+    {
+      "id": "T17",
+      "question": "In the country with the highest net revenue outside the UK, what were the top 3 products by units sold?",
+      "category": "multi-step",
+      "check": "top_k",
+      "challenge": "Two steps: find the top country other than the UK (EIRE), then rank its products by units sold, counting sales only.",
+      "passed": true,
+      "reason": "top 3 match: ['21212', '84991', '21977']",
+      "followup": null,
+      "first_turn": null,
+      "reference_sql": "WITH top_country AS (SELECT country FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' GROUP BY country ORDER BY SUM(line_value) DESC LIMIT 1) SELECT stock_code, any_value(description) AS description, SUM(quantity) AS units_sold FROM transactions WHERE line_type = 'sale' AND is_product AND country = (SELECT country FROM top_country) GROUP BY stock_code ORDER BY units_sold DESC LIMIT 3",
+      "expected": {
+        "columns": [
+          "stock_code",
+          "description",
+          "units_sold"
+        ],
+        "rows": [
+          [
+            "21212",
+            "PACK OF 72 RETROSPOT CAKE CASES",
+            6000
+          ],
+          [
+            "84991",
+            "60 TEATIME FAIRY CAKE CASES",
+            5556
+          ],
+          [
+            "21977",
+            "PACK OF 60 PINK PAISLEY CAKE CASES",
+            4212
+          ]
+        ]
+      },
+      "agent_status": "success",
+      "agent_sql": "WITH pick AS (SELECT country AS k FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' GROUP BY 1 ORDER BY SUM(line_value) DESC LIMIT 1) SELECT (SELECT k FROM pick) AS best_country, stock_code, any_value(description) AS description, SUM(quantity) AS units_sold FROM transactions WHERE line_type = 'sale' AND country = (SELECT k FROM pick) AND is_product GROUP BY stock_code ORDER BY units_sold DESC LIMIT 3",
+      "agent_answer": "Units sold by product in EIRE. Top of the list: PACK OF 72 RETROSPOT CAKE CASES (6,000); 60 TEATIME FAIRY CAKE CASES (5,556); PACK OF 60 PINK PAISLEY CAKE CASES (4,212).",
+      "actual": {
+        "columns": [
+          "best_country",
+          "stock_code",
+          "description",
+          "units_sold"
+        ],
+        "rows": [
+          [
+            "EIRE",
+            "21212",
+            "PACK OF 72 RETROSPOT CAKE CASES",
+            6000
+          ],
+          [
+            "EIRE",
+            "84991",
+            "60 TEATIME FAIRY CAKE CASES",
+            5556
+          ],
+          [
+            "EIRE",
+            "21977",
+            "PACK OF 60 PINK PAISLEY CAKE CASES",
+            4212
+          ]
+        ]
+      },
+      "attempts": 1,
+      "latency_ms": 27,
+      "model": "offline rule engine",
+      "source": "offline"
+    },
+    {
+      "id": "T18",
+      "question": "Which month of last year had the most returns, and what were the most returned products that month?",
+      "category": "multi-step",
+      "check": "top_k",
+      "challenge": "Two steps: find 2010's month with the most units returned (September 2010), then rank products by units returned in it. \"Last year\" means 2010.",
+      "passed": true,
+      "reason": "top 5 match: ['21088', '21096', '16047', '37340', '85110']",
+      "followup": null,
+      "first_turn": null,
+      "reference_sql": "WITH worst_month AS (SELECT date_trunc('month', invoice_date) AS m FROM transactions WHERE line_type = 'cancellation' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY 1 ORDER BY SUM(-quantity) DESC LIMIT 1) SELECT stock_code, any_value(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product AND date_trunc('month', invoice_date) = (SELECT m FROM worst_month) GROUP BY stock_code ORDER BY returned_units DESC LIMIT 5",
+      "expected": {
+        "columns": [
+          "stock_code",
+          "description",
+          "returned_units"
+        ],
+        "rows": [
+          [
+            "21088",
+            "SET/6 FRUIT SALAD PAPER CUPS",
+            7128
+          ],
+          [
+            "21096",
+            "SET/6 FRUIT SALAD  PAPER PLATES",
+            7008
+          ],
+          [
+            "16047",
+            "POP ART PEN CASE & PENS",
+            5184
+          ],
+          [
+            "37340",
+            "MULTICOLOUR SPRING FLOWER MUG",
+            4992
+          ],
+          [
+            "85110",
+            "BLACK SILVER FLOWER T-LIGHT HOLDER",
+            4752
+          ]
+        ]
+      },
+      "agent_status": "success",
+      "agent_sql": "WITH pick AS (SELECT date_trunc('month', invoice_date) AS k FROM transactions WHERE line_type = 'cancellation' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY 1 ORDER BY SUM(-quantity) DESC LIMIT 1) SELECT (SELECT strftime(k, '%Y-%m') FROM pick) AS best_month, stock_code, any_value(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND date_trunc('month', invoice_date) = (SELECT k FROM pick) AND is_product GROUP BY stock_code ORDER BY returned_units DESC LIMIT 10",
+      "agent_answer": "Units returned by product in September 2010. Top of the list: SET/6 FRUIT SALAD PAPER CUPS (7,128); SET/6 FRUIT SALAD  PAPER PLATES (7,008); POP ART PEN CASE & PENS (5,184).",
+      "actual": {
+        "columns": [
+          "best_month",
+          "stock_code",
+          "description",
+          "returned_units"
+        ],
+        "rows": [
+          [
+            "2010-09",
+            "21088",
+            "SET/6 FRUIT SALAD PAPER CUPS",
+            7128
+          ],
+          [
+            "2010-09",
+            "21096",
+            "SET/6 FRUIT SALAD  PAPER PLATES",
+            7008
+          ],
+          [
+            "2010-09",
+            "16047",
+            "POP ART PEN CASE & PENS",
+            5184
+          ],
+          [
+            "2010-09",
+            "37340",
+            "MULTICOLOUR SPRING FLOWER MUG",
+            4992
+          ],
+          [
+            "2010-09",
+            "85110",
+            "BLACK SILVER FLOWER T-LIGHT HOLDER",
+            4752
+          ],
+          [
+            "2010-09",
+            "16046",
+            "TEATIME PEN CASE & PENS",
+            4608
+          ],
+          [
+            "2010-09",
+            "85160A",
+            "WHITE BIRD GARDEN DESIGN MUG",
+            4320
+          ],
+          [
+            "2010-09",
+            "85184D",
+            "S/4 BLUE ROUND DECOUPAGE BOXES",
+            3936
+          ],
+          [
+            "2010-09",
+            "16162L",
+            "THE KING GIFT BAG",
+            3744
+          ],
+          [
+            "2010-09",
+            "21392",
+            "RED POLKADOT PUDDING BOWL",
+            3648
+          ]
+        ]
+      },
+      "attempts": 1,
+      "latency_ms": 17,
       "model": "offline rule engine",
       "source": "offline"
     }
