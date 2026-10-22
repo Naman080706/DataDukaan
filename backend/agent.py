@@ -86,7 +86,10 @@ def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step) 
         step("get_schema", "ok", "transactions table + data rules loaded into the prompt")
         user_msg = f"Conversation so far:\n{_history_text(history)}\n\nNew question: {question}"
         try:
-            return generate_json(PLANNER_SYSTEM, user_msg), "ai"
+            plan = generate_json(PLANNER_SYSTEM, user_msg)
+            if plan.get("action") == "clarify":
+                plan = _check_ask_back(question, history, user_msg, plan, step)
+            return plan, "ai"
         except LLMError as e:
             step("generate_sql", "error", str(e))
             if mode == "llm":
@@ -94,6 +97,25 @@ def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step) 
     step("offline_engine", "ok" if mode == "offline" else "warn",
          "Answering with the offline rule engine (no AI): pre-checked SQL templates and the same data rules")
     return plan_offline(question, history), "offline"
+
+
+def _check_ask_back(question: str, history: list[dict], user_msg: str, plan: dict, step) -> dict:
+    """The model sometimes asks back on questions the data rules already settle ("most revenue" = net revenue).
+
+    The offline engine encodes the same rules, so if it can answer without asking, the question is not
+    ambiguous: tell the model which definition applies and ask it again for SQL. Genuinely vague
+    questions (where the offline engine also asks back) keep the clarification.
+    """
+    rules_plan = plan_offline(question, history)
+    if not rules_plan or rules_plan.get("action") != "sql":
+        return plan
+    step("clarify_check", "warn", f"The model asked “{plan.get('question', '')}”, but the data rules already define this: "
+                                  f"{rules_plan['title']}. Asking it to write the SQL instead.")
+    hint = (f"{user_msg}\n\nThe data rules already answer the wording of this question, so do NOT ask a clarifying "
+            f"question. It means: {rules_plan['title']}. Applicable rules: {' '.join(rules_plan.get('assumptions', []))} "
+            f"Respond with action \"sql\".")
+    retry = generate_json(PLANNER_SYSTEM, hint)
+    return retry if retry.get("action") == "sql" else plan
 
 
 def ask(question: str, history: list[dict] | None = None, inject_fault: bool = False, summarize: bool = True,

@@ -161,6 +161,7 @@ const STEP_LABEL: Record<string, string> = {
   inspect_error: "Read the error and worked out a fix",
   summarise: "Wrote the answer from the returned rows",
   clarify: "Asked you to clarify",
+  clarify_check: "Skipped an unneeded question: the counting rules already define it",
   saved_answer: "Found a saved answer to the same question",
   offline_engine: "Switched to the offline rule engine",
   refuse: "Refused the request",

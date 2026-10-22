@@ -60,10 +60,17 @@ export default function Evaluation() {
               {suite.length || 15} questions written to trip the agent up
             </h1>
             <p className="mt-3 text-[15px] leading-relaxed text-muted">
-              Cancelled invoices, returns, customers without an ID, vague wording and a request to delete data. Each answer is checked
-              against SQL we wrote by hand: totals must match to the penny, rankings must match the reference top 5, and vague questions
-              must be asked back.
+              Each question hides a common mistake on this data: cancelled invoices, returns, customers without an ID, vague wording, or a
+              request to delete data. These tests check whether the AI agent avoids them on its own.
             </p>
+            <ol className="mt-3 list-decimal space-y-1 pl-5 text-[14px] leading-relaxed text-muted">
+              <li>For every question we wrote the correct SQL by hand and checked it against the data. That is the answer key.</li>
+              <li>The agent answers the same question by itself, without seeing the answer key.</li>
+              <li>
+                It passes if its result matches: totals to the penny, rankings by the top 5. Vague questions pass only if it asks back,
+                and the delete request only if it refuses.
+              </li>
+            </ol>
           </div>
           <button onClick={runAll} disabled={!!running || !suite.length} className="btn-carbon flex items-center gap-2">
             {running && <Loader2 size={15} className="animate-spin" />}
@@ -139,7 +146,7 @@ export default function Evaluation() {
                   {isOpen && (
                     <tr>
                       <td colSpan={4} className="bg-[#FCFBF7] px-3 pb-5 pt-3">
-                        <p className="max-w-3xl text-[13.5px] text-muted">The trap: {t.challenge}</p>
+                        <p className="max-w-3xl text-[13.5px] text-muted">The mistake this tests for: {t.challenge}</p>
                         {r && (
                           <p className={`mt-1 text-[13.5px] ${r.passed ? "text-ledger" : "text-stamp"}`}>
                             {r.passed ? "Passed" : "Failed"}: {r.reason}
@@ -152,7 +159,7 @@ export default function Evaluation() {
                         <div className="mt-4 grid gap-6 lg:grid-cols-2">
                           {t.reference_sql && (
                             <div className="min-w-0">
-                              <p className="mb-1.5 text-sm font-semibold">Our hand-written SQL</p>
+                              <p className="mb-1.5 text-sm font-semibold">Answer key: our hand-written SQL and its result</p>
                               <SqlInspector sql={t.reference_sql} note={false} />
                               {r?.expected && (
                                 <div className="mt-3">
@@ -163,7 +170,7 @@ export default function Evaluation() {
                           )}
                           {r?.agent_sql && (
                             <div className="min-w-0">
-                              <p className="mb-1.5 text-sm font-semibold">The agent's SQL</p>
+                              <p className="mb-1.5 text-sm font-semibold">What the agent wrote on its own, and its result</p>
                               <SqlInspector sql={r.agent_sql} note={false} />
                               {r.actual?.columns.length > 0 && (
                                 <div className="mt-3">
