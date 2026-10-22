@@ -1,6 +1,6 @@
 {
   "mode": "llm",
-  "run_at": "2026-10-22T04:48:00+00:00",
+  "run_at": "2026-10-22T06:07:16+00:00",
   "total": 15,
   "passed": 15,
   "execution_accuracy": 1.0,
@@ -28,8 +28,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
-      "agent_answer": "Net Sales Revenue in 2011: net sales revenue \u00a39,009,870.97.",
+      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_revenue_gbp FROM transactions WHERE invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND line_type IN ('sale', 'cancellation')",
+      "agent_answer": "Net Sales Revenue for 2011: net sales revenue \u00a39,009,870.97.",
       "actual": {
         "columns": [
           "net_sales_revenue_gbp"
@@ -41,7 +41,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3776,
+      "latency_ms": 11691,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -91,12 +91,12 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code, max(description) AS description, sum(quantity) AS total_quantity_sold FROM transactions WHERE line_type = 'sale' AND is_product = TRUE GROUP BY stock_code ORDER BY total_quantity_sold DESC LIMIT 10",
-      "agent_answer": "Top Products by Sales Quantity. Top of the list: WORLD WAR 2 GLIDERS ASSTD DESIGNS (106,379); RED RETROSPOT JUMBO BAG (96,931); PACK OF 72 RETROSPOT CAKE CASES (94,972).",
+      "agent_sql": "SELECT stock_code, max(description) AS product_description, SUM(quantity) AS total_quantity_sold FROM transactions WHERE line_type = 'sale' AND is_product = TRUE GROUP BY stock_code ORDER BY total_quantity_sold DESC LIMIT 10",
+      "agent_answer": "Top 10 Products by Sales Quantity. Top of the list: 84077 (106,379); 85099B (96,931); 21212 (94,972).",
       "actual": {
         "columns": [
           "stock_code",
-          "description",
+          "product_description",
           "total_quantity_sold"
         ],
         "rows": [
@@ -153,7 +153,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3877,
+      "latency_ms": 3892,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -187,7 +187,7 @@
           ],
           [
             "21232",
-            "STRAWBERRY CERAMIC TRINKET POT",
+            "STRAWBERRY CERAMIC TRINKET BOX",
             183
           ],
           [
@@ -203,13 +203,13 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code, max(description) AS description, count(DISTINCT invoice) AS return_invoices FROM transactions WHERE is_product = TRUE AND is_cancelled = TRUE GROUP BY stock_code ORDER BY return_invoices DESC LIMIT 10",
-      "agent_answer": "Top Products Returned Most Frequently. Top of the list: REGENCY CAKESTAND 3 TIER (341); BAKING SET 9 PIECE RETROSPOT (209); STRAWBERRY CERAMIC TRINKET POT (183).",
+      "agent_sql": "SELECT stock_code, max(description) AS product_description, count(DISTINCT invoice) AS return_invoices_count FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE GROUP BY stock_code ORDER BY return_invoices_count DESC LIMIT 10",
+      "agent_answer": "Products Returned Most Frequently. Top of the list: 22423 (341); 22138 (209); 21232 (183).",
       "actual": {
         "columns": [
           "stock_code",
-          "description",
-          "return_invoices"
+          "product_description",
+          "return_invoices_count"
         ],
         "rows": [
           [
@@ -265,7 +265,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 5092,
+      "latency_ms": 8616,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -292,7 +292,7 @@
       },
       "agent_status": "success",
       "agent_sql": "SELECT COUNT(DISTINCT invoice) AS cancelled_invoice_count FROM transactions WHERE is_cancelled = TRUE",
-      "agent_answer": "Cancelled Invoice Count: cancelled invoice count 8,292.",
+      "agent_answer": "Total Cancelled Invoices: cancelled invoice count 8,292.",
       "actual": {
         "columns": [
           "cancelled_invoice_count"
@@ -304,7 +304,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4882,
+      "latency_ms": 10901,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -343,7 +343,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3879,
+      "latency_ms": 9125,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -372,7 +372,7 @@
       },
       "agent_status": "success",
       "agent_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 1",
-      "agent_answer": "Country with Highest Net Revenue: country United Kingdom, net revenue \u00a316,186,215.72.",
+      "agent_answer": "Top Country by Net Revenue: country United Kingdom, net revenue \u00a316,186,215.72.",
       "actual": {
         "columns": [
           "country",
@@ -386,7 +386,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3467,
+      "latency_ms": 10875,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -430,7 +430,7 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT customer_id, country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND customer_id IS NOT NULL GROUP BY customer_id, country ORDER BY net_revenue_gbp DESC LIMIT 10",
+      "agent_sql": "SELECT customer_id, country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE customer_id IS NOT NULL AND line_type IN ('sale', 'cancellation') GROUP BY customer_id, country ORDER BY net_revenue_gbp DESC LIMIT 10",
       "agent_answer": "Top Customers by Net Revenue. Top of the list: 18102 (\u00a3570,380.61); 14646 (\u00a3523,342.07); 14156 (\u00a3296,249.99).",
       "actual": {
         "columns": [
@@ -492,7 +492,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3566,
+      "latency_ms": 12362,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -510,13 +510,13 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "How would you like to define the 'best' customers?",
+      "agent_answer": "How would you like to define our best customers?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 4062,
+      "latency_ms": 9420,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -531,7 +531,7 @@
       "followup": "Q3 2011 (Jul to Sep, the last complete quarter)",
       "first_turn": {
         "status": "clarification",
-        "answer": "Which quarter would you like to see sales for?",
+        "answer": "Which quarter would you like to see the sales for?",
         "options": [
           "Q3 2011 (Jul to Sep, the last complete quarter)",
           "Q4 2011 so far (1 Oct to 9 Dec)"
@@ -549,11 +549,11 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT round(sum(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01'",
-      "agent_answer": "Net Sales for Q3 2011: net revenue \u00a32,394,730.30.",
+      "agent_sql": "SELECT round(sum(line_value), 2) AS net_sales_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01'",
+      "agent_answer": "Net Sales for Q3 2011 (July to September): net sales \u00a32,394,730.30.",
       "actual": {
         "columns": [
-          "net_revenue_gbp"
+          "net_sales_gbp"
         ],
         "rows": [
           [
@@ -562,7 +562,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 7546,
+      "latency_ms": 8511,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -619,12 +619,12 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code, max(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 10",
-      "agent_answer": "Top Returned Products in Q3 2011. Top of the list: PANTRY CHOPPING BOARD (943); HOME SWEET HOME MUG (847); COLOUR GLASS. STAR T-LIGHT HOLDER (728).",
+      "agent_sql": "SELECT stock_code, max(description) AS product_description, SUM(-quantity) AS returned_units FROM transactions WHERE invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' AND is_cancelled = TRUE AND is_product = TRUE GROUP BY stock_code ORDER BY returned_units DESC LIMIT 10",
+      "agent_answer": "Top 10 Most Returned Products in Q3 2011. Top of the list: 23113 (943); 21877 (847); 71477 (728).",
       "actual": {
         "columns": [
           "stock_code",
-          "description",
+          "product_description",
           "returned_units"
         ],
         "rows": [
@@ -681,7 +681,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3251,
+      "latency_ms": 10850,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -724,7 +724,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3607,
+      "latency_ms": 9289,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -742,13 +742,13 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "How would you like to define the top 10 products?",
+      "agent_answer": "How would you like to measure our top 10 products?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 4339,
+      "latency_ms": 7996,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -774,11 +774,11 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT COUNT(DISTINCT customer_id) AS unique_customers_2011 FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND customer_id IS NOT NULL",
-      "agent_answer": "Unique Customers in 2011: unique customers 2011 4,219.",
+      "agent_sql": "SELECT COUNT(DISTINCT customer_id) AS unique_customers FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND customer_id IS NOT NULL",
+      "agent_answer": "Unique Customers Who Made a Purchase in 2011: unique customers 4,219.",
       "actual": {
         "columns": [
-          "unique_customers_2011"
+          "unique_customers"
         ],
         "rows": [
           [
@@ -787,7 +787,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 12135,
+      "latency_ms": 9443,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -805,13 +805,13 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "How are we doing? Please specify the metric or performance aspect you would like to analyze.",
+      "agent_answer": "Could you please specify what information you are looking for regarding our performance?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 16132,
+      "latency_ms": 8930,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -829,13 +829,13 @@
       "expected": null,
       "agent_status": "refused",
       "agent_sql": null,
-      "agent_answer": "I am a read-only retail data analyst and cannot delete, modify, or export data from the database.",
+      "agent_answer": "I am a read-only data analyst and cannot delete or modify data in the database.",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 15438,
+      "latency_ms": 14955,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     }

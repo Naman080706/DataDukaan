@@ -1,10 +1,9 @@
 {
   "what were the top 5 products by revenue": {
-    "sql": "SELECT stock_code, max(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE is_product = TRUE AND line_type IN ('sale', 'cancellation') GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5",
+    "sql": "SELECT stock_code, MAX(description) AS product_description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE is_product = TRUE AND line_type IN ('sale', 'cancellation') GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5",
     "assumptions": [
-      "Revenue means net revenue (sales minus returns) according to data rules.",
-      "Products are filtered by is_product = TRUE.",
-      "Money is rounded to 2 decimal places."
+      "Revenue is calculated as net sales (sales minus returns)",
+      "Only actual products are included, excluding postage, fees, and manual adjustments"
     ],
     "title": "Top 5 Products by Net Revenue",
     "model": "gemini-3.5-flash-lite"
@@ -12,42 +11,63 @@
   "what was our revenue excluding cancelled invoices": {
     "sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale'",
     "assumptions": [
-      "Revenue excluding cancelled invoices refers to gross revenue (Rule 3).",
-      "Sales are rows where line_type = 'sale' (Rule 1)."
+      "Revenue excluding cancelled invoices means gross revenue from valid sales.",
+      "Postage, fees, and non-product entries are included in standard revenue calculations unless specified otherwise."
     ],
     "title": "Gross Revenue (Excluding Cancelled Invoices)",
     "model": "gemini-3.5-flash-lite"
   },
-  "show monthly net revenue in 2011": {
-    "sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1",
+  "which products were returned most in q3 2011": {
+    "sql": "SELECT stock_code, max(description) AS product_description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 10",
     "assumptions": [
-      "Net revenue is defined as sales minus returns (line_type IN ('sale', 'cancellation')).",
-      "Year 2011 is defined as invoice_date >= '2011-01-01' and invoice_date < '2012-01-01'.",
-      "Money is in GBP and rounded to 2 decimal places."
+      "Products returned most means the total number of units returned during the third quarter of 2011 (July to September).",
+      "Postage, fees, and non-product items are excluded."
     ],
-    "title": "Monthly Net Revenue in 2011",
+    "title": "Top Returned Products in Q3 2011",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "show monthly net revenue in 2011": {
+    "sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND line_type IN ('sale', 'cancellation') GROUP BY 1 ORDER BY 1 LIMIT 200",
+    "assumptions": [
+      "Net revenue includes both regular sales and customer returns (cancellations)",
+      "Only includes transactions from the calendar year 2011",
+      "Money amounts are rounded to two decimal places in British pounds"
+    ],
+    "title": "Monthly Net Revenue for 2011",
     "model": "gemini-3.5-flash-lite"
   },
   "which country generated the highest net revenue": {
     "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 1",
     "assumptions": [
-      "Net revenue is calculated as the sum of line_value for both sales and cancellations (Data Rule 4)."
+      "Net revenue includes total sales minus returns and cancellations.",
+      "Unknown customers are included in the country totals."
     ],
     "title": "Country with Highest Net Revenue",
     "model": "gemini-3.5-flash-lite"
   },
-  "how many invoices were cancelled": {
-    "sql": "SELECT COUNT(DISTINCT invoice) AS cancelled_invoice_count FROM transactions WHERE is_cancelled = TRUE",
+  "which customers generated the most revenue": {
+    "sql": "SELECT customer_id, country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE customer_id IS NOT NULL AND line_type IN ('sale', 'cancellation') GROUP BY customer_id, country ORDER BY net_revenue_gbp DESC LIMIT 10",
     "assumptions": [
-      "Cancelled invoices are identified by having is_cancelled = TRUE (invoice number starts with 'C')."
+      "Revenue is calculated as net revenue (sales minus returns)",
+      "Customers with unknown IDs are excluded from ranking",
+      "Money is in British Pounds"
+    ],
+    "title": "Top Customers by Net Revenue",
+    "model": "gemini-3.5-flash-lite"
+  },
+  "how many invoices were cancelled": {
+    "sql": "SELECT COUNT(DISTINCT invoice) AS cancelled_invoices_count FROM transactions WHERE is_cancelled = TRUE",
+    "assumptions": [
+      "Counted unique cancelled invoice numbers across the entire period"
     ],
     "title": "Total Cancelled Invoices",
     "model": "gemini-3.5-flash-lite"
   },
   "what was our net sales revenue in 2011": {
-    "sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+    "sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_revenue_gbp FROM transactions WHERE invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND line_type IN ('sale', 'cancellation')",
     "assumptions": [
-      "Net revenue includes sales and returns (cancellations) for the calendar year 2011 (half-open range from 2011-01-01 to 2012-01-01)."
+      "Included all sales and customer returns for the calendar year 2011",
+      "Net revenue is calculated as total sales minus returns"
     ],
     "title": "Net Sales Revenue for 2011",
     "model": "gemini-3.5-flash-lite"

@@ -52,6 +52,8 @@ DATA RULES (apply to every query unless the user explicitly asks otherwise):
    (show description too, using any_value(description) or max(description)).
 8. Customer analysis (per-customer rankings/counts): add AND customer_id IS NOT NULL and say unknown customers
    were excluded. Aggregate totals (revenue, country revenue) keep rows with unknown customers.
+   Counting customers who bought / purchased / ordered (e.g. "how many customers made a purchase"): use only
+   line_type = 'sale' rows, so customers who only cancelled or returned are not counted.
 9. Order / invoice counts: COUNT(DISTINCT invoice). Cancelled invoice count = COUNT(DISTINCT invoice) WHERE is_cancelled.
 10. Money is GBP (pounds sterling). Round money to 2 decimals.
 11. Dates: data covers {DATASET_START} to {DATASET_END}. Years are calendar years
