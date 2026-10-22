@@ -143,9 +143,13 @@ def _extract_pick(q: str) -> tuple[str, dict | None]:
     }
 
 
-def plan_offline(question: str, history: list[dict] | None = None) -> dict | None:
-    """Return a planner-shaped dict (action sql/clarify/refuse) or None if not understood."""
+def plan_offline(question: str, history: list[dict] | None = None, overrides: dict | None = None) -> dict | None:
+    """Return a planner-shaped dict (action sql/clarify/refuse) or None if not understood.
+
+    overrides come from the user's past corrections (backend/memory.py): {"measure", "dim", "period", "exclude"}.
+    """
     q = _merge_followup(question, history or [])
+    ov = overrides or {}
 
     if WRITE_WORDS.search(q):
         return {"action": "refuse", "reason": "I can only read the sales data. Changing or deleting records isn't allowed."}
@@ -181,10 +185,11 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
     mm = re.findall(r"\b(" + "|".join(MONTHS) + r")\s+(2009|2010|2011)\b", q)
     my = re.findall(r"\b(2009|2010|2011)\b", q)
     # The data stops part-way through Q4 2011, so relative periods are ambiguous: ask which one.
-    if re.search(r"\b(last|previous) quarter\b", q) and not mq:
+    if re.search(r"\b(last|previous) quarter\b", q) and not mq and not ov.get("period"):
         return _clarify("Which quarter do you mean? The data ends on 9 December 2011.", QUARTER_OPTIONS)
-    if re.search(r"\b(last|previous) month\b", q) and not mm:
+    if re.search(r"\b(last|previous) month\b", q) and not mm and not ov.get("period"):
         return _clarify("Which month do you mean? The data ends on 9 December 2011.", MONTH_OPTIONS)
+    period_at = len(filters)
     if mq:
         n, y = int(mq[-1][0]), int(mq[-1][1])
         start, end = f"{y}-{3 * n - 2:02d}-01", (f"{y}-{3 * n + 1:02d}-01" if n < 4 else f"{y + 1}-01-01")
@@ -204,9 +209,18 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
         if y == 2011:
             assumptions.append("2011 data ends on 9 December 2011.")
 
+    if ov.get("period"):  # a period the user taught replaces the one read from the question
+        p = ov["period"]
+        del filters[period_at:]
+        filters.append(f"invoice_date >= '{p['start']}' AND invoice_date < '{p['end']}'")
+        period_label = f" in {p['label']}"
+        assumptions = [a for a in assumptions if not a.startswith(("This year means", "Last year means", "2011 data ends", "Q4 2011 is"))]
+
     country = next((c for c in _known_countries() if re.search(r"\b" + re.escape(c.lower()) + r"\b", q)), None)
     if country:
         filters.append(f"country = '{country}'")
+    exclusions = {"uk": "country <> 'United Kingdom'", "non_products": "is_product", "unknown_customers": "customer_id IS NOT NULL"}
+    filters += [exclusions[x] for x in ov.get("exclude", []) if x in exclusions]
 
     # Special cases with their own SQL.
     if "total transaction value" in q:
@@ -231,6 +245,8 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
         dim = "country"
     elif re.search(r"\bcustomers?\b", q) and not re.search(r"\bhow many\b|\bnumber of\b|\bcount\b", q):
         dim = "customer"
+    if ov.get("dim"):
+        dim = None if ov["dim"] == "none" else ov["dim"]
 
     # Measure.
     measure = None
@@ -259,6 +275,8 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
         elif re.search(r"\bcancel", q):
             measure = "cancelled"
 
+    if ov.get("measure") in MEASURES:
+        measure = ov["measure"]
     if measure is None:
         if dim == "customer" and re.search(r"\b(best|top|biggest|largest|most valuable|key)\b", q):
             return _clarify("How should I rank customers?", ["By net revenue", "By number of orders", "By units bought"])
