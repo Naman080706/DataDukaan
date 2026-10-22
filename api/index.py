@@ -19,7 +19,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request  # noqa: E4
 from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from backend import auth, db, evaluation  # noqa: E402
+from backend import auth, client_agent, db, evaluation  # noqa: E402
 from backend.agent import ask  # noqa: E402
 from backend.rules import AMBIGUITY_RULES, DATA_RULES, DATASET_END, DATASET_START, NON_PRODUCT_CODES  # noqa: E402
 
@@ -66,6 +66,45 @@ class CodeRequest(BaseModel):
 class VerifyRequest(BaseModel):
     challenge: str = Field(min_length=10, max_length=2000)
     code: str = Field(min_length=1, max_length=20)
+
+
+class Column(BaseModel):
+    name: str = Field(max_length=200)
+    type: str = Field(max_length=60)
+
+
+class DatasetInfo(BaseModel):
+    """What the browser tells us about a user's own dataset. The data itself stays in the browser."""
+    kind: Literal["retail", "generic"]
+    source: str = Field(default="uploaded file", max_length=200)
+    columns: list[Column] = Field(max_length=200)
+    sample_rows: list[list] = Field(default=[], max_length=5)
+    row_count: int = 0
+    date_range: list[str | None] = [None, None]
+    countries: list[str] = Field(default=[], max_length=400)
+
+
+class DatasetPlanRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    history: list[Turn] = []
+    dataset: DatasetInfo
+    mode: Literal["auto", "offline"] = "auto"
+
+
+class DatasetFixRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    sql: str = Field(max_length=8000)
+    error: str = Field(max_length=2000)
+    dataset: DatasetInfo
+
+
+class DatasetSummaryRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    title: str = Field(default="", max_length=300)
+    assumptions: list[str] = Field(default=[], max_length=12)
+    columns: list[str] = Field(max_length=60)
+    rows: list[list] = Field(max_length=50)
+    source: Literal["ai", "offline"] = "ai"
 
 
 class EvalRequest(BaseModel):
@@ -121,6 +160,21 @@ def ask_endpoint(req: AskRequest, user: dict = Signed):
     while len(HISTORY) > HISTORY_MAX:
         HISTORY.popitem(last=False)
     return result
+
+
+@app.post("/api/dataset/plan")
+def dataset_plan(req: DatasetPlanRequest, user: dict = Signed):
+    return client_agent.plan(req.question.strip(), [t.model_dump() for t in req.history], req.dataset.model_dump(), req.mode)
+
+
+@app.post("/api/dataset/fix")
+def dataset_fix(req: DatasetFixRequest, user: dict = Signed):
+    return client_agent.fix(req.question, req.sql, req.error, req.dataset.model_dump())
+
+
+@app.post("/api/dataset/summarise")
+def dataset_summarise(req: DatasetSummaryRequest, user: dict = Signed):
+    return client_agent.summarise(req.question, req.title, req.assumptions, req.columns, req.rows, req.source)
 
 
 @app.get("/api/query/{qid}")

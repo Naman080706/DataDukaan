@@ -6,8 +6,25 @@ what a question means, it returns None (or asks back) instead of guessing.
 """
 import re
 
+from dataclasses import dataclass, field
+from typing import Callable
+
 from . import db
-from .rules import MONTH_OPTIONS, QUARTER_OPTIONS
+from .rules import DATASET_END, periods
+
+YEAR_RE = r"(?:19|20)\d\d"
+
+
+@dataclass
+class Ctx:
+    """What backup mode needs to know about the dataset it is answering for."""
+    periods: dict
+    countries: list[str] | None = None            # None = read them from the built-in database
+    execute: Callable[[str], dict] | None = None  # runs SQL for step-1 lookups; None when the data lives in the browser
+    notes: list[str] = field(default_factory=list)
+
+
+BUILTIN = Ctx(periods=periods(DATASET_END), execute=db.execute_readonly_sql)
 
 # measure -> (select expression, alias, base filter, plain-English label)
 MEASURES = {
@@ -76,16 +93,16 @@ def _clarify(question: str, options: list[str]) -> dict:
 # The inner question is answered first (shown to the user), then used as a filter on the main question.
 _SUP_HIGH = {"best", "top", "highest", "biggest", "strongest", "most", "largest"}
 _XUK = r"(?P<xuk>\s+(?:outside|excluding|other than|apart from)\s+(?:the\s+)?(?:uk|united kingdom))?"
-_YEAR = r"(?:\s+(?:of|in|for)\s+(?:the\s+year\s+)?(?P<year>2009|2010|2011))?"
+_YEAR = r"(?:\s+(?:of|in|for)\s+(?:the\s+year\s+)?(?P<year>" + YEAR_RE + "))?"
 _NESTED = [
     re.compile(r"\b(?:in|for|during|from|of)\s+(?:the\s+)?(?P<sup>best|top|highest|biggest|strongest|worst|lowest|weakest)"
                r"(?:[\s-]+(?:selling|sales|revenue|performing))?\s+(?P<kind>month|quarter|country)\b" + _YEAR + _XUK),
-    re.compile(r"\b(?:in|for|during|from)\s+the\s+(?P<kind>month|quarter|country)\s+(?:of\s+(?P<year0>2009|2010|2011)\s+)?"
+    re.compile(r"\b(?:in|for|during|from)\s+the\s+(?P<kind>month|quarter|country)\s+(?:of\s+(?P<year0>" + YEAR_RE + r")\s+)?"
                r"with\s+the\s+(?P<sup>highest|most|biggest|largest|lowest|least|fewest)\s+"
                r"(?P<what>net revenue|revenue|sales|returns|returned units|orders)" + _XUK + _YEAR),
 ]
 _TWO_CLAUSE = re.compile(
-    r"^(?:which|what)\s+(?P<kind>month|quarter|country)\s+(?:(?:of|in)\s+)?(?:(?P<year>2009|2010|2011)\s+)?"
+    r"^(?:which|what)\s+(?P<kind>month|quarter|country)\s+(?:(?:of|in)\s+)?(?:(?P<year>" + YEAR_RE + r")\s+)?"
     r"(?:had|saw|got|has|did)\s+(?:the\s+)?(?P<sup>most|highest|biggest|fewest|least|lowest|best|worst)\s+"
     r"(?P<what>returns|returned units|net revenue|revenue|sales|orders)\b.*?(?:,\s*and|\s+and|,)\s+(?P<rest>.+)$")
 _KIND = {
@@ -95,7 +112,7 @@ _KIND = {
 }
 
 
-def _extract_pick(q: str) -> tuple[str, dict | None]:
+def _extract_pick(q: str, ctx: Ctx) -> tuple[str, dict | None]:
     """Find an inner "best/worst month|quarter|country" step; return the question without it, and the step."""
     m = _TWO_CLAUSE.match(q)
     rest = None
@@ -110,7 +127,7 @@ def _extract_pick(q: str) -> tuple[str, dict | None]:
     year = g.get("year") or g.get("year0")
     remaining = rest if rest is not None else (q[:m.start()] + " " + q[m.end():])
     if not year:
-        years = re.findall(r"\b(2009|2010|2011)\b", q)
+        years = re.findall(r"\b(" + YEAR_RE + r")\b", q)
         year = years[-1] if years else None
     if "return" in what:
         expr, base, measure_label = "SUM(-quantity)", "line_type = 'cancellation'", "units returned"
@@ -126,15 +143,23 @@ def _extract_pick(q: str) -> tuple[str, dict | None]:
     key, label = _KIND[kind]
     direction = "DESC" if sup in _SUP_HIGH else "ASC"
     inner = f"SELECT {key} AS k FROM transactions WHERE {' AND '.join(where)} GROUP BY 1 ORDER BY {expr} {direction} LIMIT 1"
-    picked = db.execute_readonly_sql(f"SELECT {label} AS v FROM ({inner})")["rows"]
+    word = "highest" if direction == "DESC" else "lowest"
+    scope = f" of {year}" if year else ""
+    scope += " outside the UK" if g.get("xuk") else ""
+    if ctx.execute is None:
+        # The data is in the user's browser: the step-1 answer appears as a column in the result instead.
+        return remaining, {
+            "kind": kind, "key": key, "label": label, "inner": inner, "year": year, "value": "",
+            "column": f"{'best' if direction == 'DESC' else 'worst'}_{kind}",
+            "step1": f"Find the {kind}{scope} with the {word} {measure_label}.",
+            "title": f" in the {kind} with the {word} {measure_label}",
+        }
+    picked = ctx.execute(f"SELECT {label} AS v FROM ({inner})")["rows"]
     value = picked[0][0] if picked else None
     shown = value
     if kind == "month" and value:
         y, mo = str(value).split("-")
         shown = f"{list(MONTHS)[int(mo) - 1].title()} {y}"
-    word = "highest" if direction == "DESC" else "lowest"
-    scope = f" of {year}" if year else ""
-    scope += " outside the UK" if g.get("xuk") else ""
     return remaining, {
         "kind": kind, "key": key, "label": label, "inner": inner, "year": year, "value": value,
         "column": f"{'best' if direction == 'DESC' else 'worst'}_{kind}",
@@ -143,15 +168,18 @@ def _extract_pick(q: str) -> tuple[str, dict | None]:
     }
 
 
-def plan_offline(question: str, history: list[dict] | None = None) -> dict | None:
+def plan_offline(question: str, history: list[dict] | None = None, ctx: Ctx | None = None) -> dict | None:
     """Return a planner-shaped dict (action sql/clarify/refuse) or None if not understood."""
+    ctx = ctx or BUILTIN
+    per = ctx.periods
+    ty, ly, end_label = per["this_year"], per["last_year"], per["end_label"]
     q = _merge_followup(question, history or [])
 
     if WRITE_WORDS.search(q):
         return {"action": "refuse", "reason": "I can only read the sales data. Changing or deleting records isn't allowed."}
     if re.search(r"\bhow are we doing\b|\bperformance\b|\boverview\b|\bsummary\b", q) and not METRIC_WORDS.search(q):
         return _clarify("What would you like to look at?", [
-            "Net revenue by month in 2011", "Top 10 products by net revenue", "Returned units by month in 2011"])
+            f"Net revenue by month in {ty}", "Top 10 products by net revenue", f"Returned units by month in {ty}"])
     if UNSUPPORTED_TIME.search(q):
         return None
 
@@ -161,37 +189,43 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
 
     # "This year" / "last year" are relative to the end of the data, not today.
     if re.search(r"\bthis year\b", q):
-        q = re.sub(r"\bthis year\b", "2011", q)
-        assumptions.append("This year means 2011, the latest year in the data; it ends on 9 December 2011.")
+        q = re.sub(r"\bthis year\b", str(ty), q)
+        assumptions.append(f"This year means {ty}, the latest year in the data; it ends on {end_label}.")
     if re.search(r"\blast year\b", q):
-        q = re.sub(r"\blast year\b", "2010", q)
-        assumptions.append("Last year means 2010, the year before the latest year in the data.")
+        q = re.sub(r"\blast year\b", str(ly), q)
+        assumptions.append(f"Last year means {ly}, the year before the latest year in the data.")
 
-    q, pick = _extract_pick(q)
+    q, pick = _extract_pick(q, ctx)
     if pick:
         if pick["value"] is None:
             return None
         assumptions.append(f"Step 1: {pick['step1']} Step 2 uses only that {pick['kind']}.")
         filters.append(f"{pick['key']} = (SELECT k FROM pick)")
-        if pick["kind"] == "country" and pick["year"] and not re.search(r"\b(2009|2010|2011)\b", q):
+        if pick["kind"] == "country" and pick["year"] and not re.search(r"\b" + YEAR_RE + r"\b", q):
             q += f" {pick['year']}"
 
     # Period: an explicit quarter/month/year wins; the last mention wins, so follow-ups can override.
-    mq = re.findall(r"\bq([1-4])\s*(?:of\s*)?(2009|2010|2011)\b", q)
-    mm = re.findall(r"\b(" + "|".join(MONTHS) + r")\s+(2009|2010|2011)\b", q)
-    my = re.findall(r"\b(2009|2010|2011)\b", q)
-    # The data stops part-way through Q4 2011, so relative periods are ambiguous: ask which one.
+    mq = re.findall(r"\bq([1-4])\s*(?:of\s*)?(" + YEAR_RE + r")\b", q)
+    mm = re.findall(r"\b(" + "|".join(MONTHS) + r")\s+(" + YEAR_RE + r")\b", q)
+    my = re.findall(r"\b(" + YEAR_RE + r")\b", q)
+    # If the data stops part-way through a quarter/month, relative periods are ambiguous: ask which one.
     if re.search(r"\b(last|previous) quarter\b", q) and not mq:
-        return _clarify("Which quarter do you mean? The data ends on 9 December 2011.", QUARTER_OPTIONS)
+        if len(per["quarter_options"]) > 1:
+            return _clarify(f"Which quarter do you mean? The data ends on {end_label}.", per["quarter_options"])
+        q = re.sub(r"\b(last|previous) quarter\b", per["quarter_options"][0].split(" (")[0].lower(), q)
+        mq = re.findall(r"\bq([1-4])\s*(?:of\s*)?(" + YEAR_RE + r")\b", q)
     if re.search(r"\b(last|previous) month\b", q) and not mm:
-        return _clarify("Which month do you mean? The data ends on 9 December 2011.", MONTH_OPTIONS)
+        if len(per["month_options"]) > 1:
+            return _clarify(f"Which month do you mean? The data ends on {end_label}.", per["month_options"])
+        q = re.sub(r"\b(last|previous) month\b", per["month_options"][0].split(" (")[0].lower(), q)
+        mm = re.findall(r"\b(" + "|".join(MONTHS) + r")\s+(" + YEAR_RE + r")\b", q)
     if mq:
         n, y = int(mq[-1][0]), int(mq[-1][1])
         start, end = f"{y}-{3 * n - 2:02d}-01", (f"{y}-{3 * n + 1:02d}-01" if n < 4 else f"{y + 1}-01-01")
         filters.append(f"invoice_date >= '{start}' AND invoice_date < '{end}'")
         period_label = f" in Q{n} {y}"
-        if (n, y) == (4, 2011):
-            assumptions.append("Q4 2011 is incomplete: the data ends on 9 December 2011.")
+        if per["partial_quarter"] and start == per["partial_quarter"][0]:
+            assumptions.append(f"Q{n} {y} is incomplete: the data ends on {end_label}.")
     elif mm:
         m, y = MONTHS[mm[-1][0]], int(mm[-1][1])
         end = f"{y}-{m + 1:02d}-01" if m < 12 else f"{y + 1}-01-01"
@@ -201,10 +235,10 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
         y = int(my[-1])
         filters.append(f"invoice_date >= '{y}-01-01' AND invoice_date < '{y + 1}-01-01'")
         period_label = f" in {y}"
-        if y == 2011:
-            assumptions.append("2011 data ends on 9 December 2011.")
+        if y == ty and not end_label.startswith("31 Dec"):
+            assumptions.append(f"{ty} data ends on {end_label}.")
 
-    country = next((c for c in _known_countries() if re.search(r"\b" + re.escape(c.lower()) + r"\b", q)), None)
+    country = next((c for c in (ctx.countries if ctx.countries is not None else _known_countries()) if re.search(r"\b" + re.escape(c.lower()) + r"\b", q)), None)
     if country:
         filters.append(f"country = '{country}'")
 

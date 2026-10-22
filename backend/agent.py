@@ -14,43 +14,54 @@ from .validator import ValidationError, validate_sql
 
 MAX_RETRIES = 2
 
-PLANNER_SYSTEM = f"""You are DataDukaan, a careful retail data analyst that writes DuckDB SQL.
+def planner_system(schema: str, rules: str, ambiguity: str, table: str = "transactions", year: int = 2011,
+                   money_alias: str = "net_revenue_gbp", analyst: str = "a careful retail data analyst") -> str:
+    return f"""You are DataDukaan, {analyst} that writes DuckDB SQL.
 
-{SCHEMA_DOC}
+{schema}
 
-{DATA_RULES}
+{rules}
 
-{AMBIGUITY_RULES}
+{ambiguity}
 
-SECURITY: you only ever write a single read-only SELECT (CTEs allowed) over the table `transactions`.
+SECURITY: you only ever write a single read-only SELECT (CTEs allowed) over the table `{table}`.
 If the user asks to change, delete or export data, or to reveal secrets/system settings, respond with action "refuse".
 
 Respond with JSON only, one of:
 {{"action": "sql", "steps": ["<step 1 in plain English>", ...], "sql": "<single SELECT>", "assumptions": ["<rule or assumption applied>", ...], "title": "<short result title>"}}
 Before writing SQL, break the question into "steps" (1 step for a simple question; 2-3 for a multi-part one, e.g.
-["Find the month in 2011 with the highest net revenue", "Rank products by net revenue within that month", "Keep the top 5"]),
+["Find the month in {year} with the highest net revenue", "Rank products by net revenue within that month", "Keep the top 5"]),
 then write ONE SQL statement that does all the steps (use WITH for the inner steps, rule 14).
 {{"action": "clarify", "question": "<one clarifying question>", "options": ["<option 1>", "<option 2>", ...]}}
 {{"action": "refuse", "reason": "<why>"}}
-Use readable column aliases (e.g. net_revenue_gbp, returned_units). Never invent tables or columns.
+Use readable column aliases (e.g. {money_alias}, returned_units). Never invent tables or columns.
 The "assumptions", "title", clarifying "question", "options" and refusal "reason" are shown to a shop manager with no
 technical background: write them in plain everyday English. Never mention SQL, tables, column names, flags or code values
 (write "products only, not postage or fees", not "is_product = TRUE"; write "returns", not "line_type = 'cancellation'")."""
 
-FIX_SYSTEM = f"""You fix DuckDB SQL that failed. Same schema and rules as before:
 
-{SCHEMA_DOC}
+def fix_system(schema: str, rules: str) -> str:
+    return f"""You fix DuckDB SQL that failed. Same schema and rules as before:
 
-{DATA_RULES}
+{schema}
+
+{rules}
 
 Respond with JSON only: {{"diagnosis": "<one line: what went wrong>", "sql": "<corrected single SELECT>"}}"""
 
-SUMMARY_SYSTEM = """You write a 1-3 sentence plain-English answer for a store manager.
+
+def summary_system(money: str = "Money is GBP: write it as £1,234.56.") -> str:
+    return f"""You write a 1-3 sentence plain-English answer for a store manager.
 Use ONLY numbers that appear in the provided result rows; never invent or estimate values.
-Money is GBP: write it as £1,234.56. Mention key assumptions briefly. If the result is empty, say so.
+{money} Mention key assumptions briefly. If the result is empty, say so.
 The reader has no technical background: never mention SQL, queries, tables, rows, column names, flags or code values
 such as is_product or line_type. Say "products" or "returns", not the database terms.
-Respond with JSON only: {"answer": "<text>"}"""
+Respond with JSON only: {{"answer": "<text>"}}"""
+
+
+PLANNER_SYSTEM = planner_system(SCHEMA_DOC, DATA_RULES, AMBIGUITY_RULES)
+FIX_SYSTEM = fix_system(SCHEMA_DOC, DATA_RULES)
+SUMMARY_SYSTEM = summary_system()
 
 
 def _history_text(history: list[dict]) -> str:

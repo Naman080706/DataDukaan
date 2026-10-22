@@ -26,7 +26,7 @@ class ValidationError(Exception):
     pass
 
 
-def validate_sql(sql: str) -> str:
+def validate_sql(sql: str, allowed_tables: set[str] | None = None) -> str:
     """Return cleaned SQL or raise ValidationError with a user-readable reason."""
     if not sql or not sql.strip():
         raise ValidationError("Empty SQL.")
@@ -49,7 +49,7 @@ def validate_sql(sql: str) -> str:
             name = node.name.lower()
             if isinstance(node.this, exp.Func) or not name:
                 raise ValidationError("Table functions are not allowed.")
-            if name not in ALLOWED_TABLES | cte_names:
+            if name not in (allowed_tables or ALLOWED_TABLES) | cte_names:
                 raise ValidationError(f"Unknown or disallowed table: {node.name}.")
             if node.args.get("db") or node.args.get("catalog"):
                 raise ValidationError("Qualified table names are not allowed.")
