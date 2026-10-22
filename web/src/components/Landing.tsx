@@ -72,7 +72,7 @@ export default function Landing({ session, health }: { session: Session | null; 
         </div>
 
         {/* A real answer from the data, shown the way the app shows it. */}
-        <SpotlightCard as="figure" className="sheet relative px-6 py-6 sm:px-8">
+        <SpotlightCard as="figure" label="Example answer" className="sheet relative px-6 py-6 sm:px-8">
           <p className="text-[15px] italic text-muted">“How many invoices were cancelled?”</p>
           <span className="stamp absolute right-6 top-5 text-ledger">Answered</span>
           <p className="mt-5 text-[22px] font-medium leading-snug">
