@@ -1,5 +1,13 @@
 import type { Health } from "../App";
 import type { Session } from "../auth";
+import { Mic } from "lucide-react";
+import { CountUp, SplitText, SpotlightCard } from "./bits";
+
+const STEPS: { n: string; title: string; body: string }[] = [
+  { n: "1", title: "Ask out loud or type", body: "Tap the mic and say “top 5 products last month”, or type it. Check the words, then press Ask." },
+  { n: "2", title: "It works out the answer", body: "DataDukaan reads your sales records, follows the counting rules, and asks you if the question is unclear." },
+  { n: "3", title: "See the answer and the proof", body: "A short answer, the figures in a table and chart, and a note on what was counted. Download it if you like." },
+];
 
 const TRUST: { term: string; body: string }[] = [
   {
@@ -46,9 +54,11 @@ export default function Landing({ session, health }: { session: Session | null; 
 
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-8 sm:px-6 lg:grid-cols-[1.1fr_1fr]">
         <div>
-          <h1 className="wide text-[clamp(36px,5.6vw,64px)] font-extrabold leading-[0.98] tracking-tight">Ask your shop's sales ledger anything.</h1>
+          <h1 className="wide text-[clamp(36px,5.6vw,64px)] font-extrabold leading-[0.98] tracking-tight">
+            <SplitText text="Ask your shop's sales ledger anything." />
+          </h1>
           <p className="mt-6 max-w-xl text-[18px] leading-relaxed text-ink/80">
-            Type a question the way you'd ask a colleague. DataDukaan works it out from two years of real sales records and shows you the
+            Say or type a question the way you'd ask a colleague. DataDukaan works it out from two years of real sales records and shows you the
             answer, the figures behind it, and what it counted.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -62,11 +72,11 @@ export default function Landing({ session, health }: { session: Session | null; 
         </div>
 
         {/* A real answer from the data, shown the way the app shows it. */}
-        <figure className="sheet relative px-6 py-6 sm:px-8" aria-label="Example answer">
+        <SpotlightCard as="figure" className="sheet relative px-6 py-6 sm:px-8">
           <p className="text-[15px] italic text-muted">“How many invoices were cancelled?”</p>
           <span className="stamp absolute right-6 top-5 text-ledger">Answered</span>
           <p className="mt-5 text-[22px] font-medium leading-snug">
-            <span className="narrow text-[44px] font-extrabold leading-none">8,292</span>
+            <CountUp to={8292} className="narrow text-[44px] font-extrabold leading-none" />
             <br />
             invoices were cancelled. They start with “C” and are kept out of sales figures.
           </p>
@@ -74,7 +84,23 @@ export default function Landing({ session, health }: { session: Session | null; 
             Counted every order whose invoice number starts with “C”, the shop's mark for a cancellation. Each order is counted once, even if
             it had several items.
           </p>
-        </figure>
+        </SpotlightCard>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+        <h2 className="wide text-[clamp(22px,2.8vw,30px)] font-extrabold tracking-tight">How it works</h2>
+        <ol className="mt-6 grid gap-4 md:grid-cols-3">
+          {STEPS.map((s) => (
+            <SpotlightCard key={s.n} as="li" className="sheet list-none px-6 py-6">
+                <span className="stamp stamp-sm text-carbon-deep">Step {s.n}</span>
+                <h3 className="mt-4 flex items-center gap-2 text-[18px] font-bold">
+                  {s.n === "1" && <Mic size={18} className="text-carbon-deep" aria-hidden />}
+                  {s.title}
+                </h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-ink/80">{s.body}</p>
+            </SpotlightCard>
+          ))}
+        </ol>
       </section>
 
       <section className="border-t border-rule bg-sheet">
