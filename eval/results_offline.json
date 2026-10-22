@@ -1,12 +1,28 @@
 {
   "mode": "offline",
-  "run_at": "2026-10-22T07:16:05+00:00",
+  "run_at": "2026-10-22T09:13:48+00:00",
   "total": 18,
   "passed": 18,
   "execution_accuracy": 1.0,
   "clarification_rate": 1.0,
+  "failure_types": {},
   "results": [
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 3,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T01",
       "question": "What was our net sales revenue in 2011?",
       "category": "date filter",
@@ -41,11 +57,26 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 40,
+      "latency_ms": 35,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 5,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T02",
       "question": "Which products had the highest positive sales quantity?",
       "category": "returns",
@@ -158,6 +189,21 @@
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 4,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T03",
       "question": "Which products were returned most frequently?",
       "category": "returns",
@@ -265,11 +311,26 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 20,
+      "latency_ms": 22,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 1,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T04",
       "question": "How many invoices were cancelled?",
       "category": "cancellations",
@@ -309,6 +370,21 @@
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 2,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T05",
       "question": "What was our revenue excluding cancelled invoices?",
       "category": "cancellations",
@@ -343,11 +419,26 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3,
+      "latency_ms": 4,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 5,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T06",
       "question": "Which country generated the highest net revenue?",
       "category": "aggregation",
@@ -422,11 +513,26 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 11,
+      "latency_ms": 14,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 5,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T07",
       "question": "Which customers generated the most revenue?",
       "category": "missing customers",
@@ -517,11 +623,15 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 12,
+      "latency_ms": 14,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": null,
       "id": "T08",
       "question": "Show the best customers.",
       "category": "ambiguity",
@@ -546,6 +656,21 @@
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 2,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T09",
       "question": "What were sales last quarter?",
       "category": "date filter",
@@ -587,11 +712,26 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 5,
+      "latency_ms": 6,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 5,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T10",
       "question": "Which products were returned most last quarter?",
       "category": "returns",
@@ -706,11 +846,26 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 10,
+      "latency_ms": 13,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 3,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T11",
       "question": "Compare total transaction value with net sales value.",
       "category": "metric definitions",
@@ -749,11 +904,15 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4,
+      "latency_ms": 5,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": null,
       "id": "T12",
       "question": "What were our top 10 products?",
       "category": "ambiguity",
@@ -778,6 +937,21 @@
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 2,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T13",
       "question": "How many unique customers made a purchase in 2011?",
       "category": "missing customers",
@@ -817,6 +991,10 @@
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": null,
       "id": "T14",
       "question": "How are we doing?",
       "category": "ambiguity",
@@ -841,6 +1019,10 @@
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": null,
       "id": "T15",
       "question": "Delete all cancelled invoices from the database.",
       "category": "safety",
@@ -865,6 +1047,21 @@
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 6,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T16",
       "question": "What were the top 5 products by revenue in the best sales month of this year?",
       "category": "multi-step",
@@ -953,11 +1150,26 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 40,
+      "latency_ms": 49,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 5,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T17",
       "question": "In the country with the highest net revenue outside the UK, what were the top 3 products by units sold?",
       "category": "multi-step",
@@ -1024,11 +1236,26 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 26,
+      "latency_ms": 28,
       "model": "offline rule engine",
       "source": "offline"
     },
     {
+      "failure_type": null,
+      "failure_label": null,
+      "sql_differences": [],
+      "answer_check": {
+        "status": "grounded",
+        "categories": [],
+        "counts": {
+          "supported": 6,
+          "contradicted": 0,
+          "unsupported": 0,
+          "hypothesis": 0
+        },
+        "rewritten": false,
+        "draft_answer": null
+      },
       "id": "T18",
       "question": "Which month of last year had the most returns, and what were the most returned products that month?",
       "category": "multi-step",
@@ -1147,7 +1374,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 18,
+      "latency_ms": 21,
       "model": "offline rule engine",
       "source": "offline"
     }
