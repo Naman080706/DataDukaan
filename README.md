@@ -4,6 +4,14 @@
 
 Live app: **https://datadukaan.vercel.app** · Dev log: [DEV_LOG.md](DEV_LOG.md)
 
+
+
+
+
+https://github.com/user-attachments/assets/6e7ce864-0362-4ac7-ad44-43d599a3080e
+
+
+
 ## Problem
 
 Store managers ask questions like "which products were returned most last quarter?", but they don't write SQL, and analysts become a bottleneck.
