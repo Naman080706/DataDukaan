@@ -2,7 +2,7 @@
 
 **NEXAI 2026 Hackathon · Track 1 (Agentic AI & Intelligent Automation) · Problem Statement 1.2: Text-to-SQL**
 
-Live app: _to be added after deployment_
+Live app: **https://datadukaan.vercel.app**
 
 ## Problem
 
