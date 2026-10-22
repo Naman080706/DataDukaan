@@ -1,12 +1,31 @@
 """LLM client: Gemini first, then Groq as a second provider (backend only; keys never reach the browser)."""
 import json
 import os
+import re
+import time
 
 import httpx
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 RETRYABLE = (408, 429, 500, 502, 503, 504, 404)
+MAX_WAIT_S = 8  # a short rate-limit wait is cheaper than falling through to a weaker model
+
+
+def _retry_after(r: httpx.Response) -> float | None:
+    """Seconds the provider asks us to wait before retrying (header or 'try again in 2.5s' message), if short."""
+    wait = None
+    header = r.headers.get("retry-after")
+    if header:
+        try:
+            wait = float(header)
+        except ValueError:
+            pass
+    if wait is None:
+        m = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", r.text)
+        if m:
+            wait = int(m.group(1) or 0) * 60 + float(m.group(2))
+    return wait if wait is not None and wait <= MAX_WAIT_S else None
 
 
 class LLMError(Exception):
@@ -87,6 +106,9 @@ def generate_json(system: str, user: str, temperature: float = 0.0, fast: bool =
         call = _call_gemini if provider == "gemini" else _call_groq
         try:
             r = call(model, system, user, temperature)
+            if r.status_code == 429 and (wait := _retry_after(r)) is not None:
+                time.sleep(wait + 0.2)
+                r = call(model, system, user, temperature)
         except httpx.HTTPError as e:
             errors.append(f"{provider}/{model}: {type(e).__name__}")
             continue

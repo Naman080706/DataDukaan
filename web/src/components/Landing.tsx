@@ -16,7 +16,7 @@ const TRUST: { term: string; body: string }[] = [
   },
   {
     term: "Checked against an answer key",
-    body: "We wrote 15 tricky questions and worked out the correct answers ourselves. DataDukaan gets all 15 right.",
+    body: "We wrote 18 tricky questions, including multi-part ones, and worked out the correct answers ourselves. DataDukaan gets all 18 right.",
   },
   {
     term: "Looks, never touches",

@@ -1,8 +1,8 @@
 {
   "mode": "llm-groq-only",
-  "run_at": "2026-10-22T04:51:13+00:00",
-  "total": 15,
-  "passed": 15,
+  "run_at": "2026-10-22T07:04:24+00:00",
+  "total": 18,
+  "passed": 18,
   "execution_accuracy": 1.0,
   "clarification_rate": 1.0,
   "results": [
@@ -28,7 +28,7 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS net_revenue_gbp\nFROM transactions\nWHERE line_type IN ('sale','cancellation')\n  AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale','cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
       "agent_answer": "Net sales revenue in 2011: net revenue \u00a39,009,870.97.",
       "actual": {
         "columns": [
@@ -41,7 +41,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1751,
+      "latency_ms": 1700,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -91,8 +91,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code,\n       any_value(description) AS description,\n       SUM(quantity) AS total_quantity\nFROM transactions\nWHERE line_type = 'sale'\n  AND is_product = TRUE\nGROUP BY stock_code\nORDER BY total_quantity DESC\nLIMIT 200",
-      "agent_answer": "Top products by sales quantity. Top of the list: WORLD WAR 2 GLIDERS ASSTD DESIGNS (106,379); JUMBO BAG RED WHITE SPOTTY (96,931); PACK OF 72 RETRO SPOT CAKE CASES (94,972).",
+      "agent_sql": "SELECT stock_code,\n       any_value(description) AS description,\n       SUM(quantity) AS total_quantity\nFROM transactions\nWHERE line_type = 'sale' AND is_product\nGROUP BY stock_code\nORDER BY total_quantity DESC\nLIMIT 200",
+      "agent_answer": "Top products by sales quantity. Top of the list: WORLD WAR 2 GLIDERS ASSTD DESIGNS (106,379); JUMBO BAG RED RETROSPOT (96,931); PACK OF 72 RETROSPOT CAKE CASES (94,972).",
       "actual": {
         "columns": [
           "stock_code",
@@ -107,12 +107,12 @@
           ],
           [
             "85099B",
-            "JUMBO BAG RED WHITE SPOTTY",
+            "JUMBO BAG RED RETROSPOT",
             96931
           ],
           [
             "21212",
-            "PACK OF 72 RETRO SPOT CAKE CASES",
+            "PACK OF 72 RETROSPOT CAKE CASES",
             94972
           ],
           [
@@ -122,7 +122,7 @@
           ],
           [
             "22197",
-            "SMALL POPCORN HOLDER",
+            "POPCORN HOLDER",
             88537
           ],
           [
@@ -153,7 +153,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1834,
+      "latency_ms": 1918,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -187,7 +187,7 @@
           ],
           [
             "21232",
-            "STRAWBERRY CERAMIC TRINKET POT",
+            "STRAWBERRY CERAMIC TRINKET BOX",
             183
           ],
           [
@@ -203,13 +203,13 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code,\n       any_value(description) AS description,\n       COUNT(DISTINCT invoice) AS return_invoice_count\nFROM transactions\nWHERE line_type = 'cancellation'\n  AND is_product = TRUE\nGROUP BY stock_code\nORDER BY return_invoice_count DESC\nLIMIT 200",
-      "agent_answer": "Products returned most frequently (by distinct return invoices). Top of the list: REGENCY CAKESTAND 3 TIER (341); BAKING SET 9 PIECE RETROSPOT (209); STRAWBERRY CERAMIC TRINKET POT (183).",
+      "agent_sql": "SELECT stock_code,\n       any_value(description) AS description,\n       COUNT(DISTINCT invoice) AS return_invoices\nFROM transactions\nWHERE line_type = 'cancellation'\n  AND is_product\nGROUP BY stock_code\nORDER BY return_invoices DESC\nLIMIT 10",
+      "agent_answer": "Products returned most frequently (by number of return invoices). Top of the list: REGENCY CAKESTAND 3 TIER (341); BAKING SET 9 PIECE RETROSPOT (209); STRAWBERRY CERAMIC TRINKET POT (183).",
       "actual": {
         "columns": [
           "stock_code",
           "description",
-          "return_invoice_count"
+          "return_invoices"
         ],
         "rows": [
           [
@@ -265,7 +265,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1773,
+      "latency_ms": 7912,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -291,8 +291,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT COUNT(DISTINCT invoice) AS cancelled_invoices FROM transactions WHERE is_cancelled = TRUE",
-      "agent_answer": "Cancelled invoice count: cancelled invoices 8,292.",
+      "agent_sql": "SELECT COUNT(DISTINCT invoice) AS cancelled_invoices FROM transactions WHERE is_cancelled",
+      "agent_answer": "Number of cancelled invoices: cancelled invoices 8,292.",
       "actual": {
         "columns": [
           "cancelled_invoices"
@@ -304,8 +304,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1234,
-      "model": "groq/openai/gpt-oss-120b",
+      "latency_ms": 1973,
+      "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
     {
@@ -330,8 +330,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale'",
-      "agent_answer": "Gross Revenue (excluding cancelled invoices): gross revenue \u00a320,522,679.84.",
+      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale'",
+      "agent_answer": "Total revenue excluding cancelled invoices: gross revenue \u00a320,522,679.84.",
       "actual": {
         "columns": [
           "gross_revenue_gbp"
@@ -343,8 +343,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1196,
-      "model": "groq/openai/gpt-oss-120b",
+      "latency_ms": 2198,
+      "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
     {
@@ -372,7 +372,7 @@
       },
       "agent_status": "success",
       "agent_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 1",
-      "agent_answer": "Country with highest net revenue: country United Kingdom, net revenue \u00a316,186,215.72.",
+      "agent_answer": "Country with the highest net revenue: country United Kingdom, net revenue \u00a316,186,215.72.",
       "actual": {
         "columns": [
           "country",
@@ -386,7 +386,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1217,
+      "latency_ms": 7162,
       "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
@@ -430,8 +430,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT customer_id, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND customer_id IS NOT NULL GROUP BY customer_id ORDER BY net_revenue_gbp DESC LIMIT 20",
-      "agent_answer": "Top 20 customers by net revenue. Top of the list: 18102 (\u00a3570,380.61); 14646 (\u00a3523,342.07); 14156 (\u00a3296,249.99).",
+      "agent_sql": "SELECT customer_id,\n       ROUND(SUM(line_value),2) AS net_revenue_gbp\nFROM transactions\nWHERE line_type IN ('sale','cancellation')\n  AND customer_id IS NOT NULL\nGROUP BY customer_id\nORDER BY net_revenue_gbp DESC\nLIMIT 10",
+      "agent_answer": "Top customers by net revenue. Top of the list: 18102 (\u00a3570,380.61); 14646 (\u00a3523,342.07); 14156 (\u00a3296,249.99).",
       "actual": {
         "columns": [
           "customer_id",
@@ -481,8 +481,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1143,
-      "model": "groq/qwen/qwen3.8-27b",
+      "latency_ms": 10557,
+      "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
     {
@@ -499,14 +499,14 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "What metric should I use to rank the best customers?",
+      "agent_answer": "What metric should be used to determine the best customers?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 1014,
-      "model": "groq/qwen/qwen3.8-27b",
+      "latency_ms": 3493,
+      "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
     {
@@ -522,8 +522,8 @@
         "status": "clarification",
         "answer": "Which quarter do you mean by \"last quarter\"?",
         "options": [
-          "Q3 2011 (Jul to Sep, the last complete quarter)",
-          "Q4 2011 so far (1 Oct to 9 Dec)"
+          "Q3 2011 (July to September, the last complete quarter)",
+          "Q4 2011 so far (1 October to 9 December)"
         ]
       },
       "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01'",
@@ -538,8 +538,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS net_sales_gbp FROM transactions WHERE line_type IN ('sale','cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' LIMIT 1",
-      "agent_answer": "Net sales Q3 2011: net sales \u00a32,394,730.30.",
+      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01'",
+      "agent_answer": "Net sales for Q3 2011: net sales \u00a32,394,730.30.",
       "actual": {
         "columns": [
           "net_sales_gbp"
@@ -551,7 +551,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 2164,
+      "latency_ms": 3707,
       "model": "groq/openai/gpt-oss-20b",
       "source": "ai"
     },
@@ -566,10 +566,10 @@
       "followup": "Q3 2011 (Jul to Sep, the last complete quarter)",
       "first_turn": {
         "status": "clarification",
-        "answer": "Which quarter do you mean by \"last quarter\"?",
+        "answer": "Which quarter do you mean by \u201clast quarter\u201d?",
         "options": [
-          "Q3 2011 (Jul to Sep, the last complete quarter)",
-          "Q4 2011 so far (Oct 1 to Dec 9)"
+          "Q3 2011 (July\u202f\u2013\u202fSeptember, the last complete quarter)",
+          "Q4 2011 so far (October\u202f1\u202f\u2013\u202fDecember\u202f9, 2011)"
         ]
       },
       "reference_sql": "SELECT stock_code, any_value(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 5",
@@ -608,8 +608,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code, any_value(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 20",
-      "agent_answer": "Top 20 products by units returned in Q3 2011. Top of the list: PANTRY CHOPPING BOARD (943); HOME SWEET HOME MUG (847); COLOUR GLASS. STAR T-LIGHT HOLDER (728).",
+      "agent_sql": "SELECT stock_code, any_value(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 20",
+      "agent_answer": "Most returned products in Q3 2011. Top of the list: PANTRY CHOPPING BOARD (943); HOME SWEET HOME MUG (847); COLOUR GLASS. STAR T-LIGHT HOLDER (728).",
       "actual": {
         "columns": [
           "stock_code",
@@ -670,7 +670,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1370,
+      "latency_ms": 9966,
       "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
@@ -698,8 +698,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS total_transaction_value_gbp,\n       ROUND(SUM(CASE WHEN line_type IN ('sale','cancellation') THEN line_value ELSE 0 END),2) AS net_sales_value_gbp\nFROM transactions",
-      "agent_answer": "Total Transaction Value vs Net Sales Value: total transaction value \u00a318,909,762.10, net sales value \u00a319,057,376.18.",
+      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS total_transaction_value_gbp,\n       ROUND(SUM(CASE WHEN line_type IN ('sale','cancellation') THEN line_value END),2) AS net_sales_value_gbp\nFROM transactions",
+      "agent_answer": "Total transaction value vs net sales (GBP): total transaction value \u00a318,909,762.10, net sales value \u00a319,057,376.18.",
       "actual": {
         "columns": [
           "total_transaction_value_gbp",
@@ -713,7 +713,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1590,
+      "latency_ms": 9614,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -731,14 +731,14 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "By which metric would you like to rank the top products?",
+      "agent_answer": "What metric should be used to rank the top products?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 1631,
-      "model": "groq/openai/gpt-oss-20b",
+      "latency_ms": 2902,
+      "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
     {
@@ -763,11 +763,11 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT COUNT(DISTINCT customer_id) AS unique_customers_2011 FROM transactions WHERE line_type='sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND customer_id IS NOT NULL",
-      "agent_answer": "Unique customers who made a purchase in 2011: unique customers 2011 4,219.",
+      "agent_sql": "SELECT COUNT(DISTINCT customer_id) AS unique_customers FROM transactions WHERE line_type = 'sale' AND customer_id IS NOT NULL AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+      "agent_answer": "Unique customers who made a purchase in 2011: unique customers 4,219.",
       "actual": {
         "columns": [
-          "unique_customers_2011"
+          "unique_customers"
         ],
         "rows": [
           [
@@ -776,8 +776,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1803,
-      "model": "groq/openai/gpt-oss-20b",
+      "latency_ms": 9363,
+      "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
     {
@@ -794,14 +794,14 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "What metric would you like to use to evaluate performance?",
+      "agent_answer": "What specific metric would you like to see to understand how the business is doing?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 1439,
-      "model": "groq/openai/gpt-oss-20b",
+      "latency_ms": 10167,
+      "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
     {
@@ -818,14 +818,301 @@
       "expected": null,
       "agent_status": "refused",
       "agent_sql": null,
-      "agent_answer": "Data modification requests are not allowed.",
+      "agent_answer": "I can only look up information from the sales records; I can't delete or change anything in the database.",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 1395,
-      "model": "groq/openai/gpt-oss-20b",
+      "latency_ms": 9407,
+      "model": "groq/qwen/qwen3.8-27b",
+      "source": "ai"
+    },
+    {
+      "id": "T16",
+      "question": "What were the top 5 products by revenue in the best sales month of this year?",
+      "category": "multi-step",
+      "check": "top_k",
+      "challenge": "Two steps: find 2011's best month by net revenue (November 2011), then rank products within it. \"This year\" means 2011, the latest year in the data.",
+      "passed": true,
+      "reason": "top 5 match: ['23084', '22086', '85123A', '22197', '22910']",
+      "followup": null,
+      "first_turn": null,
+      "reference_sql": "WITH best_month AS (SELECT date_trunc('month', invoice_date) AS m FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY SUM(line_value) DESC LIMIT 1) SELECT stock_code, any_value(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND is_product AND date_trunc('month', invoice_date) = (SELECT m FROM best_month) GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5",
+      "expected": {
+        "columns": [
+          "stock_code",
+          "description",
+          "net_revenue_gbp"
+        ],
+        "rows": [
+          [
+            "23084",
+            "RABBIT NIGHT LIGHT",
+            34422.09
+          ],
+          [
+            "22086",
+            "PAPER CHAIN KIT 50'S CHRISTMAS",
+            28883.04
+          ],
+          [
+            "85123A",
+            "WHITE HANGING HEART T-LIGHT HOLDER",
+            14119.8
+          ],
+          [
+            "22197",
+            "POPCORN HOLDER",
+            13968.74
+          ],
+          [
+            "22910",
+            "PAPER CHAIN KIT VINTAGE CHRISTMAS",
+            12831.54
+          ]
+        ]
+      },
+      "agent_status": "success",
+      "agent_sql": "WITH best_month AS (\n  SELECT date_trunc('month', invoice_date) AS month\n  FROM transactions\n  WHERE line_type IN ('sale','cancellation')\n    AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'\n  GROUP BY month\n  ORDER BY SUM(line_value) DESC\n  LIMIT 1\n)\nSELECT strftime((SELECT month FROM best_month), '%Y-%m') AS best_month,\n       stock_code,\n       any_value(description) AS description,\n       ROUND(SUM(line_value),2) AS net_revenue_gbp\nFROM transactions\nWHERE line_type IN ('sale','cancellation')\n  AND is_product\n  AND date_trunc('month', invoice_date) = (SELECT month FROM best_month)\nGROUP BY stock_code\nORDER BY net_revenue_gbp DESC\nLIMIT 5",
+      "agent_answer": "Top 5 products by net revenue in the best sales month of 2011. Top of the list: RABBIT NIGHT LIGHT (\u00a334,422.09); PAPER CHAIN KIT 50'S CHRISTMAS (\u00a328,883.04); WHITE HANGING HEART T-LIGHT HOLDER (\u00a314,119.80).",
+      "actual": {
+        "columns": [
+          "best_month",
+          "stock_code",
+          "description",
+          "net_revenue_gbp"
+        ],
+        "rows": [
+          [
+            "2011-11",
+            "23084",
+            "RABBIT NIGHT LIGHT",
+            34422.09
+          ],
+          [
+            "2011-11",
+            "22086",
+            "PAPER CHAIN KIT 50'S CHRISTMAS",
+            28883.04
+          ],
+          [
+            "2011-11",
+            "85123A",
+            "WHITE HANGING HEART T-LIGHT HOLDER",
+            14119.8
+          ],
+          [
+            "2011-11",
+            "22197",
+            "POPCORN HOLDER",
+            13968.74
+          ],
+          [
+            "2011-11",
+            "22910",
+            "PAPER CHAIN KIT VINTAGE CHRISTMAS",
+            12831.54
+          ]
+        ]
+      },
+      "attempts": 1,
+      "latency_ms": 10832,
+      "model": "groq/openai/gpt-oss-120b",
+      "source": "ai"
+    },
+    {
+      "id": "T17",
+      "question": "In the country with the highest net revenue outside the UK, what were the top 3 products by units sold?",
+      "category": "multi-step",
+      "check": "top_k",
+      "challenge": "Two steps: find the top country other than the UK (EIRE), then rank its products by units sold, counting sales only.",
+      "passed": true,
+      "reason": "top 3 match: ['21212', '84991', '21977']",
+      "followup": null,
+      "first_turn": null,
+      "reference_sql": "WITH top_country AS (SELECT country FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' GROUP BY country ORDER BY SUM(line_value) DESC LIMIT 1) SELECT stock_code, any_value(description) AS description, SUM(quantity) AS units_sold FROM transactions WHERE line_type = 'sale' AND is_product AND country = (SELECT country FROM top_country) GROUP BY stock_code ORDER BY units_sold DESC LIMIT 3",
+      "expected": {
+        "columns": [
+          "stock_code",
+          "description",
+          "units_sold"
+        ],
+        "rows": [
+          [
+            "21212",
+            "PACK OF 72 RETROSPOT CAKE CASES",
+            6000
+          ],
+          [
+            "84991",
+            "60 TEATIME FAIRY CAKE CASES",
+            5556
+          ],
+          [
+            "21977",
+            "PACK OF 60 PINK PAISLEY CAKE CASES",
+            4212
+          ]
+        ]
+      },
+      "agent_status": "success",
+      "agent_sql": "WITH country_rev AS (\n  SELECT country, ROUND(SUM(line_value),2) AS net_revenue_gbp\n  FROM transactions\n  WHERE line_type IN ('sale','cancellation')\n    AND country <> 'United Kingdom'\n  GROUP BY country\n  ORDER BY net_revenue_gbp DESC\n  LIMIT 1\n), top_country AS (\n  SELECT country FROM country_rev\n)\nSELECT \n  (SELECT country FROM top_country) AS country,\n  stock_code,\n  ANY_VALUE(description) AS description,\n  SUM(quantity) AS units_sold\nFROM transactions\nWHERE line_type = 'sale'\n  AND is_product\n  AND country = (SELECT country FROM top_country)\nGROUP BY stock_code\nORDER BY units_sold DESC\nLIMIT 3",
+      "agent_answer": "Top 3 products by units sold in highest\u2011revenue non\u2011UK country. Top of the list: PACK OF 72 RETROSPOT CAKE CASES (6,000); 60 TEATIME FAIRY CAKE CASES (5,556); PACK OF 60 PINK PAISLEY CAKE CASES (4,212).",
+      "actual": {
+        "columns": [
+          "country",
+          "stock_code",
+          "description",
+          "units_sold"
+        ],
+        "rows": [
+          [
+            "EIRE",
+            "21212",
+            "PACK OF 72 RETROSPOT CAKE CASES",
+            6000
+          ],
+          [
+            "EIRE",
+            "84991",
+            "60 TEATIME FAIRY CAKE CASES",
+            5556
+          ],
+          [
+            "EIRE",
+            "21977",
+            "PACK OF 60 PINK PAISLEY CAKE CASES",
+            4212
+          ]
+        ]
+      },
+      "attempts": 1,
+      "latency_ms": 7027,
+      "model": "groq/openai/gpt-oss-120b",
+      "source": "ai"
+    },
+    {
+      "id": "T18",
+      "question": "Which month of last year had the most returns, and what were the most returned products that month?",
+      "category": "multi-step",
+      "check": "top_k",
+      "challenge": "Two steps: find 2010's month with the most units returned (September 2010), then rank products by units returned in it. \"Last year\" means 2010.",
+      "passed": true,
+      "reason": "top 5 match: ['21088', '21096', '16047', '37340', '85110']",
+      "followup": null,
+      "first_turn": null,
+      "reference_sql": "WITH worst_month AS (SELECT date_trunc('month', invoice_date) AS m FROM transactions WHERE line_type = 'cancellation' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY 1 ORDER BY SUM(-quantity) DESC LIMIT 1) SELECT stock_code, any_value(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product AND date_trunc('month', invoice_date) = (SELECT m FROM worst_month) GROUP BY stock_code ORDER BY returned_units DESC LIMIT 5",
+      "expected": {
+        "columns": [
+          "stock_code",
+          "description",
+          "returned_units"
+        ],
+        "rows": [
+          [
+            "21088",
+            "SET/6 FRUIT SALAD PAPER CUPS",
+            7128
+          ],
+          [
+            "21096",
+            "SET/6 FRUIT SALAD  PAPER PLATES",
+            7008
+          ],
+          [
+            "16047",
+            "POP ART PEN CASE & PENS",
+            5184
+          ],
+          [
+            "37340",
+            "MULTICOLOUR SPRING FLOWER MUG",
+            4992
+          ],
+          [
+            "85110",
+            "BLACK SILVER FLOWER T-LIGHT HOLDER",
+            4752
+          ]
+        ]
+      },
+      "agent_status": "success",
+      "agent_sql": "WITH month_returns AS (\n  SELECT date_trunc('month', invoice_date) AS month,\n         SUM(-quantity) AS returned_units\n  FROM transactions\n  WHERE line_type = 'cancellation'\n    AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'\n  GROUP BY month\n),\nbest_month AS (\n  SELECT month\n  FROM month_returns\n  ORDER BY returned_units DESC\n  LIMIT 1\n)\nSELECT strftime((SELECT month FROM best_month), '%Y-%m') AS month,\n       stock_code,\n       any_value(description) AS description,\n       ROUND(SUM(-quantity), 2) AS returned_units\nFROM transactions\nWHERE line_type = 'cancellation'\n  AND is_product\n  AND date_trunc('month', invoice_date) = (SELECT month FROM best_month)\nGROUP BY stock_code\nORDER BY returned_units DESC\nLIMIT 10",
+      "agent_answer": "Month in 2010 with most returns and its top returned products: 10 periods. Highest was SET/6 FRUIT SALAD PAPER CUPS at 7,128, lowest was RED POLKADOT PUDDING BOWL at 3,648.",
+      "actual": {
+        "columns": [
+          "month",
+          "stock_code",
+          "description",
+          "returned_units"
+        ],
+        "rows": [
+          [
+            "2010-09",
+            "21088",
+            "SET/6 FRUIT SALAD PAPER CUPS",
+            7128
+          ],
+          [
+            "2010-09",
+            "21096",
+            "SET/6 FRUIT SALAD  PAPER PLATES",
+            7008
+          ],
+          [
+            "2010-09",
+            "16047",
+            "POP ART PEN CASE & PENS",
+            5184
+          ],
+          [
+            "2010-09",
+            "37340",
+            "MULTICOLOUR SPRING FLOWER MUG",
+            4992
+          ],
+          [
+            "2010-09",
+            "85110",
+            "BLACK SILVER FLOWER T-LIGHT HOLDER",
+            4752
+          ],
+          [
+            "2010-09",
+            "16046",
+            "TEATIME PEN CASE & PENS",
+            4608
+          ],
+          [
+            "2010-09",
+            "85160A",
+            "WHITE BIRD GARDEN DESIGN MUG",
+            4320
+          ],
+          [
+            "2010-09",
+            "85184D",
+            "S/4 BLUE ROUND DECOUPAGE BOXES",
+            3936
+          ],
+          [
+            "2010-09",
+            "16162L",
+            "THE KING GIFT BAG",
+            3744
+          ],
+          [
+            "2010-09",
+            "21392",
+            "RED POLKADOT PUDDING BOWL",
+            3648
+          ]
+        ]
+      },
+      "attempts": 1,
+      "latency_ms": 8686,
+      "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     }
   ]

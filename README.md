@@ -21,6 +21,14 @@ DataDukaan answers plain-English questions about two years of real transactions 
 6. **Answers only from the returned rows.** The answer shows the SQL, a sortable table, an automatically chosen bar or line chart, CSV export and the full tool-call trace.
 7. **Keeps history.** The session's questions and answers survive a page reload, and any answer can be kept under "Saved analyses". Both are stored in the browser (localStorage), so they belong to that browser only.
 
+### Multi-step questions
+
+Some questions need one answer to find another: "What were the top 5 products by revenue in the best sales month of this year?" means first find the best month, then rank products inside it.
+
+- **AI:** the instructions tell the model to break the question into steps first (shown in the app as "Broke the question into smaller steps") and then answer it in one query, using a `WITH` step for the inner answer. Worked examples are included. The result also shows which month or country the first step picked.
+- **Backup mode:** recognises "in the best / worst month, quarter or country (of a year, outside the UK)", "in the country with the highest net revenue…" and "which month had the most returns, and … that month". It works out the inner answer first, says it ("Step 1: the month of 2011 with the highest net revenue was November 2011"), then answers the main question within it.
+- **Definitions:** "this year" = 2011 and "last year" = 2010 (the latest years in the data); "best" month, country or product = highest net revenue unless another measure is named.
+
 ### When the AI is unavailable
 
 The free Gemini tier hit its quota during development, so the agent doesn't depend on any single AI service. Each question takes the first source that works:
@@ -31,7 +39,7 @@ The free Gemini tier hit its quota during development, so the agent doesn't depe
 
 The answer's stamp shows where it came from: "Answered", "Saved answer" or "Answered offline". For the demo, a toggle in the app forces offline mode.
 
-The **trap-question suite** has 15 team-written questions, each checked against hand-written reference SQL. The app can run it live and shows pass/fail per question.
+The **trap-question suite** has 18 team-written questions, each checked against hand-written reference SQL. The app can run it live and shows pass/fail per question.
 
 ### Pages and sign-in
 
@@ -108,7 +116,7 @@ Line-type totals after ingestion: sale 1,019,653 · cancellation 19,165 · stock
 
 ## Evaluation (trap-question suite)
 
-There are 15 questions in [`eval/trap_suite.json`](eval/trap_suite.json):
+There are 18 questions in [`eval/trap_suite.json`](eval/trap_suite.json):
 - 3 on returns
 - 2 on cancellations
 - 2 on missing customers
@@ -116,6 +124,7 @@ There are 15 questions in [`eval/trap_suite.json`](eval/trap_suite.json):
 - 2 two-turn tests (T09, T10) on "last quarter": the agent must ask which quarter, then, given "Q3 2011", answer correctly
 - 1 safety test (a delete request)
 - 2 on date filters, aggregation and metric definitions
+- 3 multi-step questions (T16 to T18), where one part depends on the answer to another: "top 5 products in the best sales month of this year", "top 3 products by units in the top country outside the UK", "the month of last year with the most returns, and its most returned products"
 
 **Pass criteria (fixed before testing):**
 - **Scalar:** every number in the reference result appears in the agent result, within £0.01 or a relative 1e-6.
@@ -128,10 +137,10 @@ The AI agent and the offline engine are scored separately (the Trap tests page h
 
 | Engine | Latest saved run | Passed | Asked back on vague questions |
 |---|---|---|---|
-| AI agent, Gemini only ([`eval/results.json`](eval/results.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
-| AI agent, Groq only, Gemini disabled ([`eval/results_groq.json`](eval/results_groq.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
-| Offline rule engine ([`eval/results_offline.json`](eval/results_offline.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
-| Full fallback chain: Gemini, then Groq, then offline ([`eval/results_chain.json`](eval/results_chain.json)) | 2026-10-22 | **15/15 (100%)** | 3/3 |
+| AI agent, Gemini only ([`eval/results.json`](eval/results.json)) | 2026-10-22 | **18/18 (100%)** | 3/3 |
+| AI agent, Groq only, Gemini disabled ([`eval/results_groq.json`](eval/results_groq.json)) | 2026-10-22 | **18/18 (100%)** | 3/3 |
+| Offline rule engine ([`eval/results_offline.json`](eval/results_offline.json)) | 2026-10-22 | **18/18 (100%)** | 3/3 |
+| Full fallback chain: Gemini, then Groq, then offline ([`eval/results_chain.json`](eval/results_chain.json)) | 2026-10-22 | **18/18 (100%)** | 3/3 |
 
 ![Trap-suite results by engine](docs/engine_comparison.png)
 
@@ -141,24 +150,24 @@ The chart is drawn from the saved runs by `python scripts/make_chart.py`. Each b
 - **Full-chain run:** Gemini's main models were rate-limited, so every answer came from `gemini-3.5-flash-lite`. In an earlier full-chain run, some questions went on to Groq's `gpt-oss-120b`.
 - **A rule gap found by testing:** in one full-chain run, T13 ("How many unique customers made a purchase in 2011?") failed: the AI counted every customer with any record in 2011 (4,244), including people who only cancelled, instead of customers with a sale (4,219). The rules didn't say this explicitly, so we added it ("counting customers who bought: sales only"), and the re-run passed.
 - **Unneeded ask-backs:** in one live run, Gemini asked "gross or net revenue?" on T07 ("Which customers generated the most revenue?") even though the rules define revenue as net, and failed. Now, when the AI wants to ask back, the agent first checks the question against the codified data rules (the same parser the offline engine uses). If the rules already define it, the AI is told which definition applies and asked again for SQL; truly vague questions still get asked back. The step shows up in the answer's "Agent steps".
-- **Groq run:** Groq's own rate limits moved the run across `gpt-oss-120b`, `qwen3.8-27b` and `gpt-oss-20b` (each test records which model answered), so the 15/15 covers that mix of models.
-- **Offline engine caveat:** we wrote it with these 15 questions in view, so its 15/15 shows it covers them, not that it handles any wording.
+- **Groq run:** Groq's own rate limits moved the run across `gpt-oss-120b`, `qwen3.8-27b` and `gpt-oss-20b` (each test records which model answered), so the 18/18 covers that mix of models. In the first 18-question Groq run, 8 tests failed with "busy" because the longer instructions used up Groq's per-minute limit; the client now waits and retries when a provider says "try again in a few seconds" (up to 8 s), and the re-run passed 18/18.
+- **Offline engine caveat:** we wrote it with these 18 questions in view, so its 18/18 shows it covers them, not that it handles any wording.
 
 ### Latency on the full data
 
 Measured by `python scripts/measure_latency.py` and saved in [`eval/latency.json`](eval/latency.json).
 
-- **Database:** the 11 trap-suite reference queries on all 1,044,848 rows, each run 5 times: median **7.1 ms**, slowest **27.7 ms**.
+- **Database:** the 14 trap-suite reference queries on all 1,044,848 rows, each run 5 times: median **7.1 ms**, slowest **29.8 ms**. Multi-step queries take no longer than simple ones.
 - **End to end:** time per question in the saved trap-suite runs. Those runs skip the final AI summary, so in the app an AI answer takes about 1 to 2 s longer. A saved answer skips the SQL-writing call.
 
 | Engine | Median | 90th percentile | Slowest |
 |---|---|---|---|
-| Gemini | 9.42 s | 12.36 s | 14.96 s |
-| Groq only | 1.44 s | 1.83 s | 2.16 s |
-| Offline engine | 0.01 s | 0.03 s | 0.06 s |
-| Full fallback chain | 11.04 s | 16.51 s | 22.23 s |
+| Gemini | 5.55 s | 17.70 s | 28.74 s |
+| Groq only | 7.54 s | 10.17 s | 10.83 s |
+| Offline engine | 0.01 s | 0.03 s | 0.04 s |
+| Full fallback chain | 6.30 s | 17.40 s | 43.52 s |
 
-Almost all the time goes to the AI call; the database is never the bottleneck. The slow Gemini and full-chain times come from rate limits: when a Gemini model returns a quota error, the next one is tried, and each failed attempt adds time before the lite model answers. In an earlier run with fewer rate limits, Gemini's median was 4.3 s and its slowest 5.3 s. Groq was the fastest and most consistent AI provider in every run.
+Almost all the time goes to the AI call; the database is never the bottleneck. The slow Gemini and full-chain times come from rate limits: when a Gemini model returns a quota error, the next one is tried, and each failed attempt adds time before the lite model answers. In an earlier run with fewer rate limits, Gemini's median was 4.3 s and its slowest 5.3 s. Groq is the most consistent AI provider; its times in this run include the short rate-limit waits. Two-turn tests (ask back, then answer) count as one test but make two AI calls, which explains the slowest times.
 
 **Limitations (stated honestly):**
 - The team wrote the questions, and the data rules in the prompt match the reference definitions, so this measures rule-following, not open-domain generalisation.
