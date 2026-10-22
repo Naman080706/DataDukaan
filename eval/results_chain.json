@@ -1,6 +1,6 @@
 {
   "mode": "chain",
-  "run_at": "2026-10-22T04:21:44+00:00",
+  "run_at": "2026-10-22T04:50:47+00:00",
   "total": 15,
   "passed": 15,
   "execution_accuracy": 1.0,
@@ -29,7 +29,7 @@
       },
       "agent_status": "success",
       "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
-      "agent_answer": "Net Sales Revenue for 2011: net sales revenue \u00a39,009,870.97.",
+      "agent_answer": "Net Sales Revenue in 2011: net sales revenue \u00a39,009,870.97.",
       "actual": {
         "columns": [
           "net_sales_revenue_gbp"
@@ -41,7 +41,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 9895,
+      "latency_ms": 3274,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -153,7 +153,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 10335,
+      "latency_ms": 17175,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -192,7 +192,7 @@
           ],
           [
             "21843",
-            "RED RETROSPOT CAKE STAND",
+            "RETRO SPOT CAKE STAND",
             154
           ],
           [
@@ -203,8 +203,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT stock_code, max(description) AS description, count(DISTINCT invoice) AS return_invoices_count FROM transactions WHERE is_cancelled = TRUE AND is_product = TRUE GROUP BY stock_code ORDER BY return_invoices_count DESC LIMIT 20",
-      "agent_answer": "Most Frequently Returned Products. Top of the list: REGENCY CAKESTAND 3 TIER (341); BAKING SET 9 PIECE RETROSPOT (209); STRAWBERRY CERAMIC TRINKET POT (183).",
+      "agent_sql": "SELECT stock_code, max(description) AS description, count(DISTINCT invoice) AS return_invoices_count FROM transactions WHERE line_type = 'cancellation' AND is_product = TRUE GROUP BY stock_code ORDER BY return_invoices_count DESC LIMIT 10",
+      "agent_answer": "Products Returned Most Frequently. Top of the list: REGENCY CAKESTAND 3 TIER (341); BAKING SET 9 PIECE RETROSPOT (209); STRAWBERRY CERAMIC TRINKET POT (183).",
       "actual": {
         "columns": [
           "stock_code",
@@ -265,7 +265,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4170,
+      "latency_ms": 3976,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -304,7 +304,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 11230,
+      "latency_ms": 3276,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -343,7 +343,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3763,
+      "latency_ms": 19447,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -386,7 +386,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4721,
+      "latency_ms": 16430,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -431,7 +431,7 @@
       },
       "agent_status": "success",
       "agent_sql": "SELECT customer_id, country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE customer_id IS NOT NULL AND line_type IN ('sale', 'cancellation') GROUP BY customer_id, country ORDER BY net_revenue_gbp DESC LIMIT 10",
-      "agent_answer": "Top Customers by Net Revenue. Top of the list: 18102 (\u00a3570,380.61); 14646 (\u00a3523,342.07); 14156 (\u00a3296,249.99).",
+      "agent_answer": "Top 10 Customers by Net Revenue. Top of the list: 18102 (\u00a3570,380.61); 14646 (\u00a3523,342.07); 14156 (\u00a3296,249.99).",
       "actual": {
         "columns": [
           "customer_id",
@@ -492,7 +492,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 8114,
+      "latency_ms": 4888,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -516,7 +516,7 @@
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 7237,
+      "latency_ms": 19928,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -562,7 +562,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 4954,
+      "latency_ms": 3740,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -681,7 +681,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 6265,
+      "latency_ms": 18551,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -724,7 +724,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 6804,
+      "latency_ms": 3630,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -742,13 +742,13 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "Would you like the top 10 products ranked by net revenue or by quantity sold?",
+      "agent_answer": "Would you like the top 10 products ranked by net revenue (in GBP) or by quantity sold?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 3645,
+      "latency_ms": 17332,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -787,7 +787,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 3818,
+      "latency_ms": 12419,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -805,13 +805,13 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "How would you like to measure our performance?",
+      "agent_answer": "Could you please specify what metric you would like to use to evaluate our performance?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 3941,
+      "latency_ms": 3431,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     },
@@ -829,13 +829,13 @@
       "expected": null,
       "agent_status": "refused",
       "agent_sql": null,
-      "agent_answer": "I am a read-only retail data analyst and cannot delete, modify, or export data from the database.",
+      "agent_answer": "I am a read-only analytics assistant and cannot modify, delete, or export data.",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 3469,
+      "latency_ms": 12020,
       "model": "gemini-3.5-flash-lite",
       "source": "ai"
     }

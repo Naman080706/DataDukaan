@@ -1,6 +1,6 @@
 {
   "mode": "llm-groq-only",
-  "run_at": "2026-10-21T20:56:52+00:00",
+  "run_at": "2026-10-22T04:51:13+00:00",
   "total": 15,
   "passed": 15,
   "execution_accuracy": 1.0,
@@ -28,8 +28,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale','cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
-      "agent_answer": "Net sales revenue in 2011 (GBP): net revenue \u00a39,009,870.97.",
+      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS net_revenue_gbp\nFROM transactions\nWHERE line_type IN ('sale','cancellation')\n  AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+      "agent_answer": "Net sales revenue in 2011: net revenue \u00a39,009,870.97.",
       "actual": {
         "columns": [
           "net_revenue_gbp"
@@ -41,7 +41,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1431,
+      "latency_ms": 1751,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -91,13 +91,13 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "WITH sales AS (\n    SELECT stock_code,\n           ANY_VALUE(description) AS description,\n           SUM(quantity) AS total_quantity_sold\n    FROM transactions\n    WHERE line_type = 'sale'  -- sales rows only (rule 1)\n      AND is_product = TRUE   -- only actual products (rule 7)\n    GROUP BY stock_code\n)\nSELECT stock_code,\n       description,\n       total_quantity_sold\nFROM sales\nORDER BY total_quantity_sold DESC\nLIMIT 10",
-      "agent_answer": "Top products by sales quantity. Top of the list: WORLD WAR 2 GLIDERS ASSTD DESIGNS (106,379); JUMBO BAG RED RETROSPOT (96,931); PACK OF 72 RETROSPOT CAKE CASES (94,972).",
+      "agent_sql": "SELECT stock_code,\n       any_value(description) AS description,\n       SUM(quantity) AS total_quantity\nFROM transactions\nWHERE line_type = 'sale'\n  AND is_product = TRUE\nGROUP BY stock_code\nORDER BY total_quantity DESC\nLIMIT 200",
+      "agent_answer": "Top products by sales quantity. Top of the list: WORLD WAR 2 GLIDERS ASSTD DESIGNS (106,379); JUMBO BAG RED WHITE SPOTTY (96,931); PACK OF 72 RETRO SPOT CAKE CASES (94,972).",
       "actual": {
         "columns": [
           "stock_code",
           "description",
-          "total_quantity_sold"
+          "total_quantity"
         ],
         "rows": [
           [
@@ -107,12 +107,12 @@
           ],
           [
             "85099B",
-            "JUMBO BAG RED RETROSPOT",
+            "JUMBO BAG RED WHITE SPOTTY",
             96931
           ],
           [
             "21212",
-            "PACK OF 72 RETROSPOT CAKE CASES",
+            "PACK OF 72 RETRO SPOT CAKE CASES",
             94972
           ],
           [
@@ -122,7 +122,7 @@
           ],
           [
             "22197",
-            "POPCORN HOLDER",
+            "SMALL POPCORN HOLDER",
             88537
           ],
           [
@@ -153,7 +153,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1661,
+      "latency_ms": 1834,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -203,8 +203,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "WITH returns AS (\n    SELECT stock_code,\n           any_value(description) AS description,\n           COUNT(DISTINCT invoice) AS return_invoice_count\n    FROM transactions\n    WHERE line_type = 'cancellation'\n      AND is_product = TRUE\n    GROUP BY stock_code\n)\nSELECT stock_code,\n       description,\n       return_invoice_count\nFROM returns\nORDER BY return_invoice_count DESC\nLIMIT 200",
-      "agent_answer": "Products returned most frequently (by number of return invoices). Top of the list: REGENCY CAKESTAND 3 TIER (341); BAKING SET 9 PIECE RETROSPOT (209); STRAWBERRY CERAMIC TRINKET POT (183).",
+      "agent_sql": "SELECT stock_code,\n       any_value(description) AS description,\n       COUNT(DISTINCT invoice) AS return_invoice_count\nFROM transactions\nWHERE line_type = 'cancellation'\n  AND is_product = TRUE\nGROUP BY stock_code\nORDER BY return_invoice_count DESC\nLIMIT 200",
+      "agent_answer": "Products returned most frequently (by distinct return invoices). Top of the list: REGENCY CAKESTAND 3 TIER (341); BAKING SET 9 PIECE RETROSPOT (209); STRAWBERRY CERAMIC TRINKET POT (183).",
       "actual": {
         "columns": [
           "stock_code",
@@ -265,7 +265,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 2105,
+      "latency_ms": 1773,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -292,7 +292,7 @@
       },
       "agent_status": "success",
       "agent_sql": "SELECT COUNT(DISTINCT invoice) AS cancelled_invoices FROM transactions WHERE is_cancelled = TRUE",
-      "agent_answer": "Number of cancelled invoices: cancelled invoices 8,292.",
+      "agent_answer": "Cancelled invoice count: cancelled invoices 8,292.",
       "actual": {
         "columns": [
           "cancelled_invoices"
@@ -304,7 +304,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1569,
+      "latency_ms": 1234,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -330,7 +330,7 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS gross_revenue_gbp\nFROM transactions\nWHERE line_type = 'sale'",
+      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale'",
       "agent_answer": "Gross Revenue (excluding cancelled invoices): gross revenue \u00a320,522,679.84.",
       "actual": {
         "columns": [
@@ -343,7 +343,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 920,
+      "latency_ms": 1196,
       "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
@@ -371,8 +371,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT country,\n       ROUND(SUM(line_value),2) AS net_revenue_gbp\nFROM transactions\nWHERE line_type IN ('sale','cancellation')\nGROUP BY country\nORDER BY net_revenue_gbp DESC\nLIMIT 1",
-      "agent_answer": "Country with Highest Net Revenue: country United Kingdom, net revenue \u00a316,186,215.72.",
+      "agent_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 1",
+      "agent_answer": "Country with highest net revenue: country United Kingdom, net revenue \u00a316,186,215.72.",
       "actual": {
         "columns": [
           "country",
@@ -386,8 +386,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1399,
-      "model": "groq/openai/gpt-oss-120b",
+      "latency_ms": 1217,
+      "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
     {
@@ -430,8 +430,8 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT customer_id,\n       ROUND(SUM(line_value),2) AS net_revenue_gbp\nFROM transactions\nWHERE line_type IN ('sale','cancellation')\n  AND customer_id IS NOT NULL\nGROUP BY customer_id\nORDER BY net_revenue_gbp DESC\nLIMIT 200",
-      "agent_answer": "Top customers by net revenue. Top of the list: 18102 (\u00a3570,380.61); 14646 (\u00a3523,342.07); 14156 (\u00a3296,249.99).",
+      "agent_sql": "SELECT customer_id, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND customer_id IS NOT NULL GROUP BY customer_id ORDER BY net_revenue_gbp DESC LIMIT 20",
+      "agent_answer": "Top 20 customers by net revenue. Top of the list: 18102 (\u00a3570,380.61); 14646 (\u00a3523,342.07); 14156 (\u00a3296,249.99).",
       "actual": {
         "columns": [
           "customer_id",
@@ -481,8 +481,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1249,
-      "model": "groq/openai/gpt-oss-120b",
+      "latency_ms": 1143,
+      "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
     {
@@ -505,7 +505,7 @@
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 1239,
+      "latency_ms": 1014,
       "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
@@ -520,7 +520,7 @@
       "followup": "Q3 2011 (Jul to Sep, the last complete quarter)",
       "first_turn": {
         "status": "clarification",
-        "answer": "Which quarter would you like to see sales for?",
+        "answer": "Which quarter do you mean by \"last quarter\"?",
         "options": [
           "Q3 2011 (Jul to Sep, the last complete quarter)",
           "Q4 2011 so far (1 Oct to 9 Dec)"
@@ -538,7 +538,7 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT ROUND(SUM(line_value), 2) AS net_sales_gbp FROM transactions WHERE invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' AND line_type IN ('sale', 'cancellation') LIMIT 200",
+      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS net_sales_gbp FROM transactions WHERE line_type IN ('sale','cancellation') AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' LIMIT 1",
       "agent_answer": "Net sales Q3 2011: net sales \u00a32,394,730.30.",
       "actual": {
         "columns": [
@@ -551,7 +551,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 2577,
+      "latency_ms": 2164,
       "model": "groq/openai/gpt-oss-20b",
       "source": "ai"
     },
@@ -569,7 +569,7 @@
         "answer": "Which quarter do you mean by \"last quarter\"?",
         "options": [
           "Q3 2011 (Jul to Sep, the last complete quarter)",
-          "Q4 2011 so far (1 Oct to 9 Dec)"
+          "Q4 2011 so far (Oct 1 to Dec 9)"
         ]
       },
       "reference_sql": "SELECT stock_code, any_value(description) AS description, SUM(-quantity) AS returned_units FROM transactions WHERE line_type = 'cancellation' AND is_product AND invoice_date >= '2011-07-01' AND invoice_date < '2011-10-01' GROUP BY stock_code ORDER BY returned_units DESC LIMIT 5",
@@ -670,7 +670,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1598,
+      "latency_ms": 1370,
       "model": "groq/qwen/qwen3.8-27b",
       "source": "ai"
     },
@@ -698,25 +698,23 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT\n  ROUND(SUM(line_value), 2) AS total_transaction_value_gbp,\n  ROUND(SUM(CASE WHEN line_type IN ('sale', 'cancellation') THEN line_value ELSE 0 END), 2) AS net_sales_value_gbp,\n  ROUND(SUM(line_value) - SUM(CASE WHEN line_type IN ('sale', 'cancellation') THEN line_value ELSE 0 END), 2) AS difference_gbp\nFROM transactions",
-      "agent_answer": "Total transaction value vs net sales value: total transaction value \u00a318,909,762.10, net sales value \u00a319,057,376.18, difference \u00a3-147,614.08.",
+      "agent_sql": "SELECT ROUND(SUM(line_value),2) AS total_transaction_value_gbp,\n       ROUND(SUM(CASE WHEN line_type IN ('sale','cancellation') THEN line_value ELSE 0 END),2) AS net_sales_value_gbp\nFROM transactions",
+      "agent_answer": "Total Transaction Value vs Net Sales Value: total transaction value \u00a318,909,762.10, net sales value \u00a319,057,376.18.",
       "actual": {
         "columns": [
           "total_transaction_value_gbp",
-          "net_sales_value_gbp",
-          "difference_gbp"
+          "net_sales_value_gbp"
         ],
         "rows": [
           [
             18909762.1,
-            19057376.18,
-            -147614.08
+            19057376.18
           ]
         ]
       },
       "attempts": 1,
-      "latency_ms": 1589,
-      "model": "groq/qwen/qwen3.8-27b",
+      "latency_ms": 1590,
+      "model": "groq/openai/gpt-oss-120b",
       "source": "ai"
     },
     {
@@ -733,14 +731,14 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "By which metric should the top products be ranked?",
+      "agent_answer": "By which metric would you like to rank the top products?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 1311,
-      "model": "groq/openai/gpt-oss-120b",
+      "latency_ms": 1631,
+      "model": "groq/openai/gpt-oss-20b",
       "source": "ai"
     },
     {
@@ -765,11 +763,11 @@
         ]
       },
       "agent_status": "success",
-      "agent_sql": "SELECT COUNT(DISTINCT customer_id) AS unique_customers\nFROM transactions\nWHERE line_type = 'sale'\n  AND customer_id IS NOT NULL\n  AND invoice_date >= '2011-01-01'\n  AND invoice_date < '2012-01-01'",
-      "agent_answer": "Unique customers with a purchase in 2011: unique customers 4,219.",
+      "agent_sql": "SELECT COUNT(DISTINCT customer_id) AS unique_customers_2011 FROM transactions WHERE line_type='sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND customer_id IS NOT NULL",
+      "agent_answer": "Unique customers who made a purchase in 2011: unique customers 2011 4,219.",
       "actual": {
         "columns": [
-          "unique_customers"
+          "unique_customers_2011"
         ],
         "rows": [
           [
@@ -778,8 +776,8 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 1429,
-      "model": "groq/qwen/qwen3.8-27b",
+      "latency_ms": 1803,
+      "model": "groq/openai/gpt-oss-20b",
       "source": "ai"
     },
     {
@@ -796,13 +794,13 @@
       "expected": null,
       "agent_status": "clarification",
       "agent_sql": null,
-      "agent_answer": "What metric would you like to see to evaluate performance?",
+      "agent_answer": "What metric would you like to use to evaluate performance?",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 1883,
+      "latency_ms": 1439,
       "model": "groq/openai/gpt-oss-20b",
       "source": "ai"
     },
@@ -820,13 +818,13 @@
       "expected": null,
       "agent_status": "refused",
       "agent_sql": null,
-      "agent_answer": "The request to delete data is not allowed. I can only provide read-only queries.",
+      "agent_answer": "Data modification requests are not allowed.",
       "actual": {
         "columns": [],
         "rows": []
       },
       "attempts": 0,
-      "latency_ms": 2501,
+      "latency_ms": 1395,
       "model": "groq/openai/gpt-oss-20b",
       "source": "ai"
     }

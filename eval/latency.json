@@ -1,66 +1,66 @@
 {
-  "measured_at": "2026-10-21T20:57:04+00:00",
+  "measured_at": "2026-10-22T04:51:21+00:00",
   "rows": 1044848,
   "database": {
     "queries": 11,
     "runs_each": 5,
-    "median_ms": 5.3,
-    "slowest_query_ms": 18.3,
+    "median_ms": 5.5,
+    "slowest_query_ms": 25.4,
     "per_query": [
       {
         "id": "T01",
-        "median_ms": 5.3,
-        "max_ms": 8.3
+        "median_ms": 4.4,
+        "max_ms": 10.4
       },
       {
         "id": "T02",
-        "median_ms": 12.5,
-        "max_ms": 13.2
+        "median_ms": 16.9,
+        "max_ms": 18.1
       },
       {
         "id": "T03",
-        "median_ms": 18.0,
-        "max_ms": 18.3
+        "median_ms": 24.4,
+        "max_ms": 25.4
       },
       {
         "id": "T04",
-        "median_ms": 4.6,
-        "max_ms": 5.7
+        "median_ms": 5.5,
+        "max_ms": 6.0
       },
       {
         "id": "T05",
-        "median_ms": 1.7,
-        "max_ms": 2.2
+        "median_ms": 3.0,
+        "max_ms": 3.1
       },
       {
         "id": "T06",
-        "median_ms": 8.8,
-        "max_ms": 9.2
+        "median_ms": 11.5,
+        "max_ms": 11.8
       },
       {
         "id": "T07",
-        "median_ms": 10.4,
-        "max_ms": 10.9
+        "median_ms": 12.1,
+        "max_ms": 13.1
       },
       {
         "id": "T09",
         "median_ms": 3.7,
-        "max_ms": 4.5
+        "max_ms": 4.0
       },
       {
         "id": "T10",
-        "median_ms": 6.7,
-        "max_ms": 8.3
+        "median_ms": 6.5,
+        "max_ms": 8.0
       },
       {
         "id": "T11",
-        "median_ms": 3.0,
-        "max_ms": 3.2
+        "median_ms": 4.0,
+        "max_ms": 4.2
       },
       {
         "id": "T13",
-        "median_ms": 4.2,
-        "max_ms": 5.6
+        "median_ms": 4.0,
+        "max_ms": 4.4
       }
     ]
   },
@@ -68,18 +68,18 @@
     {
       "engine": "Gemini",
       "tests": 15,
-      "median_s": 4.26,
-      "p90_s": 4.55,
-      "max_s": 5.31,
-      "run_at": "2026-10-21T20:55:05+00:00"
+      "median_s": 4.06,
+      "p90_s": 15.44,
+      "max_s": 16.13,
+      "run_at": "2026-10-22T04:48:00+00:00"
     },
     {
       "engine": "Groq only",
       "tests": 15,
-      "median_s": 1.57,
-      "p90_s": 2.5,
-      "max_s": 2.58,
-      "run_at": "2026-10-21T20:56:52+00:00"
+      "median_s": 1.44,
+      "p90_s": 1.83,
+      "max_s": 2.16,
+      "run_at": "2026-10-22T04:51:13+00:00"
     },
     {
       "engine": "Offline engine",
@@ -92,10 +92,10 @@
     {
       "engine": "Full fallback chain",
       "tests": 15,
-      "median_s": 4.32,
-      "p90_s": 4.48,
-      "max_s": 8.85,
-      "run_at": "2026-10-21T20:56:23+00:00"
+      "median_s": 12.02,
+      "p90_s": 19.45,
+      "max_s": 19.93,
+      "run_at": "2026-10-22T04:50:47+00:00"
     }
   ]
 }

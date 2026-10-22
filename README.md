@@ -120,8 +120,9 @@ The AI agent and the offline engine are scored separately (the Trap tests page h
 
 The chart is drawn from the saved runs by `python scripts/make_chart.py`. Each bar splits passes into correct answers, rightly asked back and rightly refused, with failures in red.
 
-- **Gemini run:** rate limits spread the run across four Gemini models (`gemini-3.5-flash`, `gemini-2.5-flash`, `gemini-flash-latest`, `gemini-3.5-flash-lite`); each test records which one answered. An earlier Gemini run scored 14/15: its only failure was T09, and it failed because every Gemini model returned a quota error, not because of wrong SQL. That failure led to the fallback chain.
+- **Gemini run:** the main Gemini models were rate-limited, so every answer came from `gemini-3.5-flash-lite`; each test records which model answered. An earlier Gemini run scored 14/15: its only failure was T09, and it failed because every Gemini model returned a quota error, not because of wrong SQL. That failure led to the fallback chain.
 - **Full-chain run:** Gemini's main models were rate-limited, so every answer came from `gemini-3.5-flash-lite`. In an earlier full-chain run, some questions went on to Groq's `gpt-oss-120b`.
+- **Unneeded ask-backs:** in one live run, Gemini asked "gross or net revenue?" on T07 ("Which customers generated the most revenue?") even though the rules define revenue as net, and failed. Now, when the AI wants to ask back, the agent first checks the question against the codified data rules (the same parser the offline engine uses). If the rules already define it, the AI is told which definition applies and asked again for SQL; truly vague questions still get asked back. The step shows up in the answer's "Agent steps".
 - **Groq run:** Groq's own rate limits moved the run across `gpt-oss-120b`, `qwen3.8-27b` and `gpt-oss-20b` (each test records which model answered), so the 15/15 covers that mix of models.
 - **Offline engine caveat:** we wrote it with these 15 questions in view, so its 15/15 shows it covers them, not that it handles any wording.
 
@@ -129,17 +130,17 @@ The chart is drawn from the saved runs by `python scripts/make_chart.py`. Each b
 
 Measured by `python scripts/measure_latency.py` and saved in [`eval/latency.json`](eval/latency.json).
 
-- **Database:** the 11 trap-suite reference queries on all 1,044,848 rows, each run 5 times: median **5.3 ms**, slowest **18.3 ms**.
+- **Database:** the 11 trap-suite reference queries on all 1,044,848 rows, each run 5 times: median **5.5 ms**, slowest **25.4 ms**.
 - **End to end:** time per question in the saved trap-suite runs. Those runs skip the final AI summary, so in the app an AI answer takes about 1 to 2 s longer. A saved answer skips the SQL-writing call.
 
 | Engine | Median | 90th percentile | Slowest |
 |---|---|---|---|
-| Gemini | 4.26 s | 4.55 s | 5.31 s |
-| Groq only | 1.57 s | 2.50 s | 2.58 s |
+| Gemini | 4.06 s | 15.44 s | 16.13 s |
+| Groq only | 1.44 s | 1.83 s | 2.16 s |
 | Offline engine | 0.01 s | 0.02 s | 0.04 s |
-| Full fallback chain | 4.32 s | 4.48 s | 8.85 s |
+| Full fallback chain | 12.02 s | 19.45 s | 19.93 s |
 
-Almost all the time goes to the AI call; the database is never the bottleneck. The slowest full-chain answer (8.85 s) is a question where Gemini failed and the request moved on to Groq.
+Almost all the time goes to the AI call; the database is never the bottleneck. The slow Gemini and full-chain times come from rate limits: when a Gemini model returns a quota error, the next one is tried, and each failed attempt adds time before the lite model answers. In the run before this one, with fewer rate limits, Gemini's median was 4.3 s and its slowest 5.3 s. Groq was the fastest and most consistent AI provider in every run.
 
 **Limitations (stated honestly):**
 - The team wrote the questions, and the data rules in the prompt match the reference definitions, so this measures rule-following, not open-domain generalisation.
