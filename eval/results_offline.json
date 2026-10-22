@@ -1,6 +1,6 @@
 {
   "mode": "offline",
-  "run_at": "2026-10-22T06:54:49+00:00",
+  "run_at": "2026-10-22T07:16:05+00:00",
   "total": 18,
   "passed": 18,
   "execution_accuracy": 1.0,
@@ -41,7 +41,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 38,
+      "latency_ms": 40,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -153,7 +153,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 15,
+      "latency_ms": 16,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -244,7 +244,7 @@
           ],
           [
             "21527",
-            "RETRO SPOT TRADITIONAL TEAPOT",
+            "RED RETROSPOT TRADITIONAL TEAPOT",
             114
           ],
           [
@@ -422,7 +422,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 12,
+      "latency_ms": 11,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -556,7 +556,7 @@
       "followup": "Q3 2011 (Jul to Sep, the last complete quarter)",
       "first_turn": {
         "status": "clarification",
-        "answer": "Which quarter do you mean? The data ends on 9 December 2011.",
+        "answer": "Which quarter do you mean? The data ends on 9 Dec 2011.",
         "options": [
           "Q3 2011 (Jul to Sep, the last complete quarter)",
           "Q4 2011 so far (1 Oct to 9 Dec)"
@@ -602,7 +602,7 @@
       "followup": "Q3 2011 (Jul to Sep, the last complete quarter)",
       "first_turn": {
         "status": "clarification",
-        "answer": "Which quarter do you mean? The data ends on 9 December 2011.",
+        "answer": "Which quarter do you mean? The data ends on 9 Dec 2011.",
         "options": [
           "Q3 2011 (Jul to Sep, the last complete quarter)",
           "Q4 2011 so far (1 Oct to 9 Dec)"
@@ -706,7 +706,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 9,
+      "latency_ms": 10,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -749,7 +749,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 5,
+      "latency_ms": 4,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -812,7 +812,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 6,
+      "latency_ms": 7,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -953,7 +953,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 44,
+      "latency_ms": 40,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -1024,7 +1024,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 27,
+      "latency_ms": 26,
       "model": "offline rule engine",
       "source": "offline"
     },
@@ -1147,7 +1147,7 @@
         ]
       },
       "attempts": 1,
-      "latency_ms": 17,
+      "latency_ms": 18,
       "model": "offline rule engine",
       "source": "offline"
     }
