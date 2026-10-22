@@ -47,7 +47,7 @@ How sign-in works (`backend/auth.py`):
 
 Everything is stateless, so it works on serverless hosting with no user database. Profile details, history and saved analyses are stored in the browser per email. The retry limits are kept in memory per server instance, so they're best-effort on serverless.
 
-**EmailJS setup:** create an email service and a template whose "To email" is `{{to_email}}` and whose body uses `{{passcode}}` (also available: `{{expires_in}}`, `{{app_name}}`). In Account > Security, enable "Allow EmailJS API for non-browser applications". Then set `EMAILJS_SERVICE_ID`, `EMAILJS_TEMPLATE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_PRIVATE_KEY` and `AUTH_SECRET` (see `.env.example`), locally and in Vercel.
+**EmailJS setup:** create an email service and a template whose "To email" is `{{to_email}}` (or `{{email}}`) and whose body uses `{{passcode}}` (also available: `{{expires_in}}`, `{{app_name}}`). In Account > Security, enable "Allow EmailJS API for non-browser applications". Then set `EMAILJS_SERVICE_ID`, `EMAILJS_TEMPLATE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_PRIVATE_KEY` and `AUTH_SECRET` (see `.env.example`), locally and in Vercel.
 
 ## Architecture
 

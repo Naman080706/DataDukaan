@@ -69,7 +69,9 @@ def _send_email(email: str, code: str) -> None:
         "template_id": os.environ["EMAILJS_TEMPLATE_ID"],
         "user_id": os.environ["EMAILJS_PUBLIC_KEY"],
         "accessToken": os.environ["EMAILJS_PRIVATE_KEY"],
-        "template_params": {"to_email": email, "passcode": code, "expires_in": f"{CODE_TTL_S // 60} minutes", "app_name": "DataDukaan"},
+        # The recipient is sent as both names so a template's "To Email" can use {{to_email}} or {{email}}.
+        "template_params": {"to_email": email, "email": email, "passcode": code,
+                            "expires_in": f"{CODE_TTL_S // 60} minutes", "app_name": "DataDukaan"},
     }
     try:
         r = httpx.post(EMAILJS_URL, json=body, timeout=20)
