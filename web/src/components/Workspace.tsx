@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mic, Square } from "lucide-react";
 import { api, AskResponse, Turn } from "../api";
 import ResultView from "./ResultView";
+import { useSpeech } from "../speech";
 import { loadSaved, loadSession, SavedAnalysis, saveSession, storeSaved } from "../storage";
 
 const SUGGESTED = [
@@ -47,6 +48,8 @@ export default function Workspace({ email }: { email: string }) {
   const [simulateOutage, setSimulateOutage] = useState(false);
   const [conversationId, setConversationId] = useState(() => restored?.conversationId ?? crypto.randomUUID());
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Spoken words land in the box for the user to check and send; nothing is sent automatically.
+  const voice = useSpeech(setInput);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -217,11 +220,31 @@ export default function Workspace({ email }: { email: string }) {
             placeholder={entries.length ? "Ask a follow-up, like “now only for Germany”" : "Ask about revenue, returns, customers or countries"}
             className="max-h-40 min-h-[44px] flex-1 resize-none border-b-2 border-ink bg-transparent px-1 py-2 text-[17px] outline-none placeholder:text-muted/70 focus:border-carbon"
           />
+          {voice.supported && (
+            <button
+              type="button"
+              onClick={voice.listening ? voice.stop : voice.start}
+              disabled={busy}
+              aria-pressed={voice.listening}
+              aria-label={voice.listening ? "Stop listening" : "Speak your question"}
+              title={voice.listening ? "Stop listening" : "Speak your question"}
+              className={`mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-colors disabled:opacity-40 ${
+                voice.listening ? "animate-pulse border-stamp bg-stamp text-white" : "border-carbon-deep text-carbon-deep hover:bg-carbon-wash/60"
+              }`}
+            >
+              {voice.listening ? <Square size={14} fill="currentColor" /> : <Mic size={18} />}
+            </button>
+          )}
           <button disabled={busy || !input.trim()} className="btn-carbon mb-1 flex items-center gap-2">
             {busy && <Loader2 className="animate-spin" size={15} />}
             {busy ? "Working" : "Ask"}
           </button>
         </div>
+        {(voice.listening || voice.error) && (
+          <p role="status" className={`px-4 pt-2 text-[13px] ${voice.error ? "text-stamp" : "text-carbon-deep"}`}>
+            {voice.error ?? "Listening… speak your question, then check it and press Ask."}
+          </p>
+        )}
         <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-3 pt-2 text-[13px] text-muted">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={injectFault} onChange={(e) => setInjectFault(e.target.checked)} className="accent-carbon-deep" />
