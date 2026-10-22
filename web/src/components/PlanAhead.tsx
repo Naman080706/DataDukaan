@@ -119,8 +119,8 @@ export default function PlanAhead() {
         {plan && (
           <>
             <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-muted">
-              The top products and countries were checked against the shop's own benchmarks for {plan.benchmarks.period} ({pct(plan.benchmarks.product_return_rate)} of
-              product units sold came back) and against their forecasts for {plan.period}. Actions are ranked by how serious the finding is and how much money is
+              The top products and countries were checked against the shop's own benchmarks for {plan.benchmarks.period}, when{" "}
+              {pct(plan.benchmarks.product_return_rate)} of product units sold came back, and against their forecasts for {plan.period}. Actions are ranked by how serious the finding is and how much money is
               at stake. Every action lists the figures it is based on.
             </p>
             <dl className="mt-5 flex flex-wrap gap-x-12 gap-y-4 border-y-[3px] border-double border-ink py-4">

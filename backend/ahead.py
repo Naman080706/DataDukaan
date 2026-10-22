@@ -5,17 +5,9 @@ The answer text is written by a template from the tool's own numbers (no AI), so
 import re
 
 from .actions import action_plan
-from .forecast import ForecastError, forecast, parse_question
-
-MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
-               "November", "December"]
+from .forecast import MONTH_NAMES, ForecastError, forecast, month_name, parse_question
 ACTION_WORDS = re.compile(r"\b(what should (?:i|we) (?:do|focus on|fix|prioriti[sz]e)|recommend\w*|action (?:list|plan)|"
                           r"next steps|to-?do list|needs? (?:my|our)? ?attention|what (?:to|should we) fix|priorit(?:y|ies))\b")
-
-
-def month_name(period: str) -> str:
-    y, m = period.split("-")
-    return f"{MONTH_NAMES[int(m) - 1]} {y}"
 
 
 def fmt(unit: str, v: float) -> str:

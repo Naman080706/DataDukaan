@@ -86,14 +86,14 @@ export default function App() {
               <span className="mt-1 block text-[13px] text-muted">Ask the shop's sales ledger in plain English</span>
             </span>
           </a>
-          <nav className="flex flex-1 gap-x-6 gap-y-1 overflow-x-auto" role="tablist">
+          <nav className="order-last flex w-full flex-wrap gap-x-6 gap-y-1 xl:order-none xl:w-auto xl:flex-1" role="tablist">
             {NAV.map(({ route: r, label }) => (
               <a key={r} href={`#/${r}`} role="tab" aria-selected={route === r} className="tab text-[15px]">
                 {label}
               </a>
             ))}
           </nav>
-          <div className="flex items-end gap-6 pb-3">
+          <div className="ml-auto flex items-end gap-6 pb-3 xl:ml-0">
             <DatasetStatus health={health} />
             {session && <ProfileLink email={session.email} active={route === "profile"} />}
           </div>

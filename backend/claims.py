@@ -67,8 +67,13 @@ def _is_num(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
+def col_words(col: str) -> str:
+    """'forecast_net_revenue_gbp' -> 'forecast net revenue (£)', as the answer page shows columns."""
+    return col.removesuffix("_gbp").replace("_", " ") + (" (£)" if col.endswith("_gbp") else "")
+
+
 def _label(col: str, row: int) -> str:
-    return f"row {row + 1}, {col.replace('_', ' ')}"
+    return f"row {row + 1}, {col_words(col)}"
 
 
 class Evidence:
@@ -90,7 +95,7 @@ class Evidence:
         self.derived.append((float(len(rows)), "number of results"))
         for ci in numeric:
             vals = [(ri, float(r[ci])) for ri, r in enumerate(self.rows) if r[ci] is not None]
-            col = columns[ci].replace("_", " ")
+            col = col_words(columns[ci])
             total = sum(v for _, v in vals)
             if len(vals) > 1:
                 self.derived.append((total, f"total of {col}"))
@@ -267,7 +272,7 @@ def _check_clause(answer: str, cs: int, ce: int, ev: Evidence, labels, rows, col
         hit = ev.find(value, tol, kind, qual)
         if hit:
             add("number", cs + m.start(), cs + m.end(), "supported", f"{'matches' if hit[0] == 'direct' else 'derived from'} {hit[1]}")
-            col = next((ci for ci, c in enumerate(columns) if hit[1].endswith(", " + c.replace("_", " "))), None)
+            col = next((ci for ci, c in enumerate(columns) if hit[1].endswith(", " + col_words(c))), None)
             if col is not None:
                 matched_cols.append(col)
         else:

@@ -52,6 +52,16 @@ def month_range(start: str, end: str) -> list[str]:
     return out
 
 
+MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+               "November", "December"]
+
+
+def month_name(period: str) -> str:
+    """'2011-12' -> 'December 2011'."""
+    y, m = period.split("-")
+    return f"{MONTH_NAMES[int(m) - 1]} {y}"
+
+
 def next_months(after: str, n: int) -> list[str]:
     y, m = map(int, after.split("-"))
     out = []
@@ -246,12 +256,12 @@ def forecast(metric: str = "net_revenue", scope: str = "total", key: str | None 
     _, _, metric_label, unit = METRICS[metric]
     notes = [
         "The data ends on 9 December 2011, so the forecast starts with December 2011 and is based on months up to November 2011.",
-        f"Model chosen by testing each one on the past {len(result['backtest']['points'])} months, up to {horizon} months ahead: "
+        f"Model chosen by testing each one on the past {len(result['backtest']['points'])} months, up to {horizon} month{'s' if horizon > 1 else ''} ahead: "
         f"{MODEL_INFO[result['model']['name']].lower()}. Typical error in those tests: {result['backtest']['mape']:.0%}.",
         "The ranges show where the real figure should fall 80% and 95% of the time, judged by how wrong the model was in those tests.",
     ]
     if result["capped"]:
-        spikes = ", ".join(f"{p['period']} ({p['value']:,.0f})" for p in result["capped"])
+        spikes = ", ".join(f"{month_name(p['period'])} ({p['value']:,.0f})" for p in result["capped"])
         notes.append(f"One-off spikes were capped at {result['cap']:,.0f} so a single bulk return doesn't drive the forecast: {spikes}.")
     if len(result["forecast"]) > 1:
         notes.append("The total's range treats each month's error as independent, so it is approximate.")

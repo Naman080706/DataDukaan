@@ -6,7 +6,7 @@ Two steps, both deterministic so every number in an action can be traced to a qu
   2. Recommend: turn each finding into a concrete action, ranked by severity x money at stake.
 """
 from . import db
-from .forecast import forecast_series, month_range, next_months, LAST_FULL_MONTH
+from .forecast import forecast_series, month_name, month_range, next_months, LAST_FULL_MONTH
 from .validator import validate_sql
 
 LAST_12 = ("2010-12-01", "2011-12-01")    # Dec 2010 - Nov 2011, the last 12 complete months
@@ -69,7 +69,7 @@ def _fc(series: list[tuple[str, float]], robust: bool = False) -> dict | None:
 
 def _period_text() -> str:
     months = next_months(LAST_FULL_MONTH, HORIZON)
-    return f"{months[0]} to {months[-1]}"
+    return f"{month_name(months[0])} to {month_name(months[-1])}"
 
 
 def _in_list(keys: list[str]) -> str:
@@ -101,7 +101,7 @@ def benchmarks() -> dict:
     gross, ret_value = _run(f"SELECT SUM(line_value) FILTER (WHERE line_type = 'sale'), SUM(-line_value) FILTER (WHERE line_type = 'cancellation') "
                             f"FROM transactions WHERE invoice_date >= '{s}' AND invoice_date < '{e}'")[0]
     return {"product_return_rate": round(returned / units, 4), "return_value_share": round(ret_value / gross, 4),
-            "period": "December 2010 to November 2011 (the last 12 complete months)"}
+            "period": "the last 12 complete months (December 2010 to November 2011)"}
 
 
 def diagnose_products(bench: dict) -> list[dict]:
@@ -222,7 +222,7 @@ def _product_actions(p: dict, customers: list[dict], bench: dict) -> list[dict]:
     share = returned / p["returned_units"] if p["returned_units"] else 0
     if customers and share >= CONCENTRATION_SHARE:
         who = "the customer" if len(customers) == 1 else f"the {len(customers)} customers"
-        ids = " and ".join(f"{c['customer_id']} ({c['returned_units']:,} units)" for c in customers)
+        ids = " and ".join(f"{c['customer_id']} ({c['returned_units']:,} unit{'' if c['returned_units'] == 1 else 's'})" for c in customers)
         out.append(_action(p["status"], p, "R3", f"Contact {who} behind {share:.0%} of {p['description']} returns",
                            f"Customers {ids} account for {share:.0%} of this product's returned units. Check whether these were "
                            "bulk orders placed by mistake, and add a confirmation step for unusually large orders.",
@@ -250,9 +250,9 @@ def _stock_actions(products: list[dict], limit: int = 3) -> list[dict]:
             continue
         unit_price = p["net_revenue_gbp"] / p["units_sold"] if p["units_sold"] else 0
         out.append(_action("Opportunity", p, "R6", f"Stock up on {p['description']} ({p['key']})",
-                           f"Forecast {nxt['value']:,.0f} units in {nxt['period']}, against a usual {p['avg_month_units']:,.0f} a month. "
+                           f"Forecast {nxt['value']:,.0f} units in {month_name(nxt['period'])}, against a usual {p['avg_month_units']:,.0f} a month. "
                            f"Plan stock for up to {nxt['hi80']:,.0f} (the top of the 80% range).",
-                           [f"80% range for {nxt['period']}: {nxt['lo80']:,.0f} to {nxt['hi80']:,.0f} units."],
+                           [f"80% range for {month_name(nxt['period'])}: {nxt['lo80']:,.0f} to {nxt['hi80']:,.0f} units."],
                            (nxt["value"] - p["avg_month_units"]) * unit_price))
         if len(out) == limit:
             break

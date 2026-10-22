@@ -120,7 +120,9 @@ export function ClaimSuite() {
                     </td>
                     <td className="hidden align-top text-[13px] text-muted sm:table-cell">{r.planted}</td>
                     <td className="py-2 text-right align-top">
-                      <span className={`stamp stamp-sm ${r.passed ? "text-ledger" : "text-stamp"}`}>{r.passed ? "Caught" : "Missed"}</span>
+                      <span className={`stamp stamp-sm ${r.passed ? "text-ledger" : "text-stamp"}`}>
+                        {r.expected.status === "grounded" ? (r.passed ? "No false alarm" : "False alarm") : r.passed ? "Caught" : "Missed"}
+                      </span>
                     </td>
                   </tr>
                   {open === r.id && (
@@ -151,13 +153,27 @@ const ROLE_LABEL = { repeat: "Same question", paraphrase: "Similar question", co
 /** Correction memory: does one correction fix repeated and similar questions, without changing unrelated ones? */
 export function LearningSuite({ mode }: { mode: EvalMode }) {
   const [saved, setSaved] = useState<LearningRun | null>(null);
+  const [fallback, setFallback] = useState(false);
   const [live, setLive] = useState<LearningRun | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
     setLive(null);
-    api.savedLearning(mode).then(setSaved).catch(() => setSaved(null));
+    setFallback(false);
+    // Until an AI run is saved, show backup mode's (deterministic) saved run and say so.
+    api
+      .savedLearning(mode)
+      .then(setSaved)
+      .catch(() =>
+        mode === "llm"
+          ? api.savedLearning("offline").then((r) => {
+              setSaved(r);
+              setFallback(true);
+            })
+          : Promise.reject(),
+      )
+      .catch(() => setSaved(null));
   }, [mode]);
 
   // One scenario per request keeps each call well inside serverless time limits.
@@ -204,7 +220,8 @@ export function LearningSuite({ mode }: { mode: EvalMode }) {
           </dl>
           <p className="mt-3 text-[13px] text-muted">
             {live ? "Live run." : `Showing the run saved on ${new Date(run.run_at).toLocaleString("en-GB")}.`}
-            {mode === "offline" ? " Backup mode applies corrections exactly, so this run is the same every time." : ""}
+            {fallback ? " No run with AI has been saved yet, so this is backup mode's run; run the tests now to try it with AI." : ""}
+            {run.mode === "offline" ? " Backup mode applies corrections exactly, so this run is the same every time." : ""}
           </p>
           <table className="ledger mt-4 w-full text-[14px]">
             <tbody>

@@ -10,6 +10,8 @@ const TAB_LABEL: Record<Tab, string> = { chart: "Chart", actions: "Actions", tab
 
 export default function ResultView({ r }: { r: AskResponse }) {
   const hasChart = r.chart_type !== "none";
+  // "Using what you taught me" is shown above the result with a link, so it isn't repeated here.
+  const assumptions = (r.assumptions ?? []).filter((a) => !a.startsWith("Using what you taught me"));
   const isActions = r.kind === "actions" && !!r.action_plan;
   const [tab, setTab] = useState<Tab>(isActions ? "actions" : hasChart ? "chart" : "table");
   const tabs: Tab[] = isActions
@@ -18,9 +20,9 @@ export default function ResultView({ r }: { r: AskResponse }) {
 
   return (
     <div className="mt-5">
-      {r.assumptions?.length > 0 && (
+      {assumptions.length > 0 && (
         <ul className="margin-rule max-w-3xl space-y-1 text-[13.5px] leading-snug text-muted">
-          {r.assumptions.map((a, i) => (
+          {assumptions.map((a, i) => (
             <li key={i}>{a}</li>
           ))}
         </ul>
