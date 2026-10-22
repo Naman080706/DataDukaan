@@ -22,7 +22,7 @@ from backend import db, evaluation  # noqa: E402
 from backend.agent import ask  # noqa: E402
 from backend.rules import AMBIGUITY_RULES, DATA_RULES, DATASET_END, DATASET_START, NON_PRODUCT_CODES  # noqa: E402
 
-app = FastAPI(title="RetailIQ API", version="1.0")
+app = FastAPI(title="DataDukaan API", version="1.0")
 
 # Best-effort query history (per server instance; serverless instances do not share it).
 HISTORY: "OrderedDict[str, dict]" = OrderedDict()

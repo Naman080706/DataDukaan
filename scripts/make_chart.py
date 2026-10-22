@@ -61,7 +61,7 @@ def main() -> None:
 
     run_date = datetime.fromisoformat(max(s["run_at"] for s in scores)).astimezone().strftime("%d %b %Y")
     fig.text(0.02, 0.955, "Which engine gets the trap questions right", ha="left", va="top", fontsize=17, fontweight="bold", color=INK)
-    fig.text(0.02, 0.885, f"DataDukaan (RetailIQ): the same {total} trap questions, scored against hand-written SQL. Runs saved {run_date}.",
+    fig.text(0.02, 0.885, f"DataDukaan: the same {total} trap questions, scored against hand-written SQL. Runs saved {run_date}.",
              ha="left", va="top", fontsize=10, color=MUTED)
     ax.legend(loc="upper center", bbox_to_anchor=(0.45, -0.14), ncol=5, frameon=False, fontsize=9.5, columnspacing=1.4, labelcolor=INK)
 

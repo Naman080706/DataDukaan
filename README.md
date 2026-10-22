@@ -1,4 +1,4 @@
-# RetailIQ: an Ask-Your-Data sales agent (DataDukaan)
+# DataDukaan: an Ask-Your-Data sales agent
 
 **NEXAI 2026 Hackathon · Track 1 (Agentic AI & Intelligent Automation) · Problem Statement 1.2: Text-to-SQL**
 
@@ -11,7 +11,7 @@ Real retail data is messy. Cancelled invoices, returns recorded as negative quan
 
 ## Solution
 
-RetailIQ answers plain-English questions about two years of real transactions (UCI Online Retail II, about 1.04M lines). For each question it:
+DataDukaan answers plain-English questions about two years of real transactions (UCI Online Retail II, about 1.04M lines). For each question it:
 
 1. **Clarifies or plans:** if the deciding metric is undefined ("best customers", "top products", "how are we doing"), it asks back with options instead of guessing.
 2. **Generates schema-aware SQL** that follows a written set of [data rules](#data-rules).
@@ -180,7 +180,7 @@ npm --prefix web install && npm --prefix web run dev   # frontend on http://loca
 
 ## Dataset attribution and licence
 
-**Online Retail II**: Chen, D. (2012). UCI Machine Learning Repository. https://doi.org/10.24432/C5CG6D. Licensed under **CC BY 4.0**. It contains 1,067,371 transaction lines from a UK online gift retailer, December 2009 to December 2011. RetailIQ uses no other data.
+**Online Retail II**: Chen, D. (2012). UCI Machine Learning Repository. https://doi.org/10.24432/C5CG6D. Licensed under **CC BY 4.0**. It contains 1,067,371 transaction lines from a UK online gift retailer, December 2009 to December 2011. DataDukaan uses no other data.
 
 ## Team
 
