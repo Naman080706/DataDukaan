@@ -219,6 +219,30 @@ def run_eval(req: EvalRequest, user: dict = Signed):
     return evaluation.run_suite(req.ids, req.mode, req.check_answers)
 
 
+class LearningRequest(BaseModel):
+    ids: list[str] | None = None
+    mode: Literal["llm", "offline"] = "offline"
+
+
+@app.get("/api/evaluation/learning/suite")
+def learning_suite(user: dict = Signed):
+    return evaluation.load_learning_suite()
+
+
+@app.post("/api/evaluation/learning")
+def run_learning(req: LearningRequest, user: dict = Signed):
+    """Teach each scenario's correction and compare its probes before and after (the UI sends one scenario per request)."""
+    return evaluation.run_learning_suite(req.ids, req.mode)
+
+
+@app.get("/api/evaluation/learning/results")
+def learning_results(mode: Literal["llm", "offline"] = "offline", user: dict = Signed):
+    res = evaluation.load_learning_results(mode)
+    if res is None:
+        raise HTTPException(404, "No saved learning run yet.")
+    return res
+
+
 @app.get("/api/evaluation/claims")
 def eval_claims(user: dict = Signed):
     """Runs the planted-error claim suite live (no AI calls, so it is fast)."""

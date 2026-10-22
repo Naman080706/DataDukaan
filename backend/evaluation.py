@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 
 from . import db, sql_facts
-from .agent import ask
+from .agent import ask, correct
 from .claims import CLAIM_CATEGORIES, check_answer
 from .offline import _known_countries
 
@@ -195,6 +195,68 @@ def summarise_run(results: list[dict], mode: str = "llm") -> dict:
 def run_suite(ids: list[str] | None = None, mode: str = "llm", check_answers: bool = False) -> dict:
     tests = [t for t in load_suite() if not ids or t["id"] in ids]
     return summarise_run([run_test(t, mode, check_answers) for t in tests], mode)
+
+
+LEARNING_SUITE_PATH = os.path.join(ROOT, "eval", "learning_suite.json")
+
+
+def load_learning_suite() -> list[dict]:
+    with open(LEARNING_SUITE_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def run_learning_scenario(sc: dict, mode: str = "offline") -> dict:
+    """Teach one correction, then ask its probes with and without it remembered.
+
+    "repeat" and "paraphrase" probes should flip from fail to pass; "control" probes are questions the
+    correction must NOT change, so they should pass both times.
+    """
+    ask_mode = "offline" if mode == "offline" else "llm"
+    teach = sc["teach"]
+    original = ask(teach["question"], summarize=False, mode=ask_mode, use_cache=False)
+    taught = correct(teach["question"], original.get("sql"), sc["type"], teach["choice"], teach["rationale"],
+                     mode="offline" if mode == "offline" else "auto")
+    memory_ = [taught["correction"]] if taught.get("correction") else []
+    probes = []
+    for p in sc["probes"]:
+        expected = db.execute_readonly_sql(p["reference_sql"])
+        row = {"role": p["role"], "question": p["question"], "reference_sql": p["reference_sql"]}
+        for phase, mem in (("before", []), ("after", memory_)):
+            actual = ask(p["question"], summarize=False, mode=ask_mode, use_cache=False, corrections=mem)
+            ok, reason = compare(p, expected, actual)
+            row[phase] = {"passed": ok, "reason": reason, "sql": actual.get("sql"), "source": actual.get("source"),
+                          "applied": [c["rule"] for c in actual.get("applied_corrections", [])]}
+        probes.append(row)
+    return {"id": sc["id"], "type": sc["type"], "pattern": sc["pattern"], "teach": teach,
+            "learned": taught.get("correction"), "taught_status": taught["status"], "original_sql": original.get("sql"),
+            "probes": probes}
+
+
+def summarise_learning(scenarios: list[dict], mode: str) -> dict:
+    probes = [p for s in scenarios for p in s["probes"]]
+    learn = [p for p in probes if p["role"] != "control"]
+    control = [p for p in probes if p["role"] == "control"]
+    count = lambda ps, phase: sum(p[phase]["passed"] for p in ps)  # noqa: E731
+    return {"mode": mode, "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "learn_total": len(learn), "learn_before": count(learn, "before"), "learn_after": count(learn, "after"),
+            "control_total": len(control), "control_before": count(control, "before"), "control_after": count(control, "after"),
+            "scenarios": scenarios}
+
+
+def run_learning_suite(ids: list[str] | None = None, mode: str = "offline") -> dict:
+    return summarise_learning([run_learning_scenario(s, mode) for s in load_learning_suite() if not ids or s["id"] in ids], mode)
+
+
+def learning_results_path(mode: str) -> str:
+    return os.path.join(ROOT, "eval", f"results_learning_{'offline' if mode == 'offline' else 'llm'}.json")
+
+
+def load_learning_results(mode: str) -> dict | None:
+    path = learning_results_path(mode)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def run_claim_suite() -> dict:
