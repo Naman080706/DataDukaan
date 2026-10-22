@@ -78,6 +78,7 @@ class VerifyRequest(BaseModel):
 class EvalRequest(BaseModel):
     ids: list[str] | None = None
     mode: Literal["llm", "offline"] = "llm"
+    check_answers: bool = False  # also write and claim-check the answer (one more AI call per test)
 
 
 @app.get("/api/health")
@@ -169,7 +170,13 @@ def suite(user: dict = Signed):
 @app.post("/api/evaluation/run")
 def run_eval(req: EvalRequest, user: dict = Signed):
     # The UI runs one test per request so long suites never hit serverless time limits.
-    return evaluation.run_suite(req.ids, req.mode)
+    return evaluation.run_suite(req.ids, req.mode, req.check_answers)
+
+
+@app.get("/api/evaluation/claims")
+def eval_claims(user: dict = Signed):
+    """Runs the planted-error claim suite live (no AI calls, so it is fast)."""
+    return evaluation.run_claim_suite()
 
 
 @app.get("/api/evaluation/results")
