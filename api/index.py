@@ -19,8 +19,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request  # noqa: E4
 from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from backend import actions, auth, db, evaluation, forecast  # noqa: E402
-from backend.agent import ask  # noqa: E402
+from backend import actions, auth, db, evaluation, forecast, memory  # noqa: E402
+from backend.agent import ask, correct  # noqa: E402
 from backend.rules import AMBIGUITY_RULES, DATA_RULES, DATASET_END, DATASET_START, NON_PRODUCT_CODES  # noqa: E402
 
 app = FastAPI(title="DataDukaan API", version="1.0")
@@ -50,12 +50,39 @@ class Turn(BaseModel):
     sql: str | None = None
 
 
+class Correction(BaseModel):
+    """One remembered correction. Kept in the user's browser and sent with each question (the server stores none)."""
+    id: str = Field(max_length=40)
+    type: Literal["wrong_metric", "wrong_period", "wrong_grouping", "missing_exclusion", "other"]
+    question: str = Field(max_length=1000)
+    rule: str = Field(max_length=500)
+    rationale: str = Field(default="", max_length=1000)
+    original_sql: str | None = Field(default=None, max_length=6000)
+    corrected_sql: str | None = Field(default=None, max_length=6000)  # re-validated before it is ever run
+    override: dict = {}
+    term: str | None = Field(default=None, max_length=60)
+    title: str = Field(default="", max_length=300)
+    assumptions: list[str] = []
+    enabled: bool = True
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
     conversation_id: str | None = None
     history: list[Turn] = []
     inject_fault: bool = False
     # "auto": saved answers, then AI, then offline engine. "offline": rule engine only (outage demo).
+    mode: Literal["auto", "offline"] = "auto"
+    corrections: list[Correction] = Field(default=[], max_length=100)
+
+
+class CorrectRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    original_sql: str | None = Field(default=None, max_length=6000)
+    type: Literal["wrong_metric", "wrong_period", "wrong_grouping", "missing_exclusion", "other"]
+    choice: str | None = Field(default=None, max_length=40)
+    rationale: str = Field(default="", max_length=1000)
+    history: list[Turn] = []
     mode: Literal["auto", "offline"] = "auto"
 
 
@@ -121,7 +148,8 @@ def rules(user: dict = Signed):
 
 @app.post("/api/ask")
 def ask_endpoint(req: AskRequest, user: dict = Signed):
-    result = ask(req.question.strip(), [t.model_dump() for t in req.history], inject_fault=req.inject_fault, mode=req.mode)
+    result = ask(req.question.strip(), [t.model_dump() for t in req.history], inject_fault=req.inject_fault, mode=req.mode,
+                 corrections=[c.model_dump() for c in req.corrections])
     qid = uuid.uuid4().hex[:12]
     result["id"] = qid
     result["conversation_id"] = req.conversation_id
@@ -129,6 +157,24 @@ def ask_endpoint(req: AskRequest, user: dict = Signed):
     while len(HISTORY) > HISTORY_MAX:
         HISTORY.popitem(last=False)
     return result
+
+
+@app.get("/api/corrections/options")
+def correction_options(user: dict = Signed):
+    """The structured choices offered under each kind of correction."""
+    return {"types": memory.TYPES,
+            "choices": {kind: [{"key": k, "label": v[0]} for k, v in opts.items()] for kind, opts in memory.CHOICES.items()}}
+
+
+@app.post("/api/correct")
+def correct_endpoint(req: CorrectRequest, user: dict = Signed):
+    """Work out the corrected answer and the correction to remember. Nothing is stored until the browser keeps it."""
+    out = correct(req.question.strip(), req.original_sql, req.type, req.choice, req.rationale,
+                  [t.model_dump() for t in req.history], req.mode)
+    if out.get("result"):
+        out["result"]["id"] = uuid.uuid4().hex[:12]
+        HISTORY[out["result"]["id"]] = out["result"]
+    return out
 
 
 @app.post("/api/forecast")

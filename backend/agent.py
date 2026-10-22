@@ -5,8 +5,10 @@ Plans come from, in order: saved answers, the LLM chain (Gemini, then Groq), the
 """
 import json
 import time
+import uuid
+from datetime import datetime, timezone
 
-from . import ahead, cache, claims, db
+from . import ahead, cache, claims, db, memory
 from .llm import LLMError, generate_json
 from .offline import _known_countries, describe_result, plan_offline
 from .rules import AMBIGUITY_RULES, DATA_RULES, SCHEMA_DOC
@@ -86,8 +88,22 @@ def choose_chart(columns: list[str], rows: list[list]) -> str:
     return "bar" if len(rows) <= 50 else "none"
 
 
-def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step) -> tuple[dict | None, str]:
-    """Pick a plan. mode: 'auto' (saved -> AI -> offline), 'llm' (AI only), 'offline' (rule engine only)."""
+def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step,
+          lessons: list[dict] | None = None) -> tuple[dict | None, str]:
+    """Pick a plan. mode: 'auto' (saved -> AI -> offline), 'llm' (AI only), 'offline' (rule engine only).
+
+    lessons: the user's past corrections that apply to this question (backend/memory.py).
+    """
+    lessons = lessons or []
+    exact = memory.exact_match(question, lessons)
+    if exact:
+        step("recall_corrections", "ok", f"You corrected this exact question before; reusing the corrected calculation "
+                                         f"({exact['rule']}). It is re-checked and re-run now")
+        return {"action": "sql", "sql": exact["corrected_sql"], "assumptions": exact.get("assumptions", []),
+                "title": exact.get("title", ""), "_model": "learned from your correction"}, "learned"
+    if lessons:  # saved answers are shared by everyone, so they can't carry one user's corrections
+        use_cache = False
+        step("recall_corrections", "ok", "Applying what you taught me: " + "; ".join(memory.describe(c) for c in lessons))
     if mode == "auto" and use_cache and not history:
         saved = cache.get(question)
         if saved:
@@ -96,10 +112,12 @@ def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step) 
     if mode in ("auto", "llm"):
         step("get_schema", "ok", "transactions table + data rules loaded into the prompt")
         user_msg = f"Conversation so far:\n{_history_text(history)}\n\nNew question: {question}"
+        if lessons:
+            user_msg += "\n\n" + memory.prompt_block(lessons)
         try:
             plan = generate_json(PLANNER_SYSTEM, user_msg)
             if plan.get("action") == "clarify":
-                plan = _check_ask_back(question, history, user_msg, plan, step)
+                plan = _check_ask_back(question, history, user_msg, plan, step, memory.merged_override(lessons))
             return plan, "ai"
         except LLMError as e:
             step("generate_sql", "error", str(e))
@@ -107,17 +125,17 @@ def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step) 
                 return None, "ai"
     step("offline_engine", "ok" if mode == "offline" else "warn",
          "Answering with the offline rule engine (no AI): pre-checked SQL templates and the same data rules")
-    return plan_offline(question, history), "offline"
+    return plan_offline(question, history, memory.merged_override(lessons)), "offline"
 
 
-def _check_ask_back(question: str, history: list[dict], user_msg: str, plan: dict, step) -> dict:
+def _check_ask_back(question: str, history: list[dict], user_msg: str, plan: dict, step, overrides: dict | None = None) -> dict:
     """The model sometimes asks back on questions the data rules already settle ("most revenue" = net revenue).
 
     The offline engine encodes the same rules, so if it can answer without asking, the question is not
     ambiguous: tell the model which definition applies and ask it again for SQL. Genuinely vague
     questions (where the offline engine also asks back) keep the clarification.
     """
-    rules_plan = plan_offline(question, history)
+    rules_plan = plan_offline(question, history, overrides)
     if not rules_plan or rules_plan.get("action") != "sql":
         return plan
     step("clarify_check", "warn", f"The model asked “{plan.get('question', '')}”, but the data rules already define this: "
@@ -130,7 +148,7 @@ def _check_ask_back(question: str, history: list[dict], user_msg: str, plan: dic
 
 
 def ask(question: str, history: list[dict] | None = None, inject_fault: bool = False, summarize: bool = True,
-        mode: str = "auto", use_cache: bool = True) -> dict:
+        mode: str = "auto", use_cache: bool = True, corrections: list[dict] | None = None) -> dict:
     t0 = time.perf_counter()
     trace: list[dict] = []
     history = history or []
@@ -152,8 +170,11 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
             _check_claims(resp, question, step, rewrite=False)
         return _finish(resp, t0)
 
-    # 1-3. Understand the question; clarify or plan SQL.
-    plan, source = _plan(question, history, mode, use_cache and not inject_fault, step)
+    # 1-3. Recall past corrections that apply; understand the question; clarify or plan SQL.
+    lessons = memory.retrieve(question, corrections or [])
+    resp["applied_corrections"] = [{"id": c.get("id"), "question": c["question"], "rule": c["rule"], "type": c["type"],
+                                    "score": c["score"]} for c in lessons]
+    plan, source = _plan(question, history, mode, use_cache and not inject_fault, step, lessons)
     resp["source"] = source
     if plan is None:
         resp["status"] = "unavailable"
@@ -178,11 +199,12 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
         return _finish(resp, t0)
 
     sql = plan.get("sql", "")
-    resp["assumptions"] = plan.get("assumptions", [])
+    taught = [f"Using what you taught me: {c['rule']}" for c in lessons]
+    resp["assumptions"] = plan.get("assumptions", []) + [t for t in taught if t not in plan.get("assumptions", [])]
     resp["title"] = plan.get("title", "")
     if plan.get("steps") and len(plan["steps"]) > 1:
         step("plan_steps", "ok", " → ".join(str(x) for x in plan["steps"]))
-    if source != "saved":
+    if source not in ("saved", "learned"):
         step("generate_sql", "ok", sql)
     if inject_fault:
         col = next((c for c in ("line_value", "quantity", "invoice", "is_cancelled", "country", "customer_id") if c in sql), None)
@@ -226,7 +248,7 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     resp.update(status="success", sql=sql, columns=result["columns"], rows=result["rows"],
                 truncated=result["truncated"], chart_type=choose_chart(result["columns"], result["rows"]))
 
-    if source == "ai" and mode == "auto" and use_cache and not history and not inject_fault:
+    if source == "ai" and mode == "auto" and use_cache and not history and not inject_fault and not lessons:
         cache.put(question, {**plan, "sql": sql, "model": resp["model"]})
 
     # 7. Summarise only the actual result.
@@ -296,3 +318,55 @@ def _fix(sql: str, error: str, question: str, step) -> str | None:
 def _finish(resp: dict, t0: float) -> dict:
     resp["latency_ms"] = round((time.perf_counter() - t0) * 1000)
     return resp
+
+
+CORRECT_SYSTEM = f"""You correct DuckDB SQL that ran but computed the wrong thing for this user.
+
+{SCHEMA_DOC}
+
+{DATA_RULES}
+
+The user's correction overrides the default data rules above where they conflict. Change only what the correction
+asks for and keep everything else in the original SQL. Write ONE read-only SELECT over `transactions`.
+Respond with JSON only: {{"sql": "<corrected single SELECT>", "title": "<short result title>",
+"assumptions": ["<rule or assumption applied, in plain everyday English>", ...]}}"""
+
+
+def correct(question: str, original_sql: str | None, kind: str, choice: str | None, rationale: str = "",
+            history: list[dict] | None = None, mode: str = "auto") -> dict:
+    """Turn "That's not quite right" into a corrected calculation plus a correction record to remember.
+
+    The corrected SQL comes from the AI when available (told what was wrong) and otherwise from the offline
+    engine with the correction as an override. It is then run through the normal pipeline (validate, run,
+    summarise, claim check) by asking again with the draft correction applied.
+    """
+    label, override, words = memory.CHOICES.get(kind, {}).get(choice or "", (None, {}, None))
+    if not words and not rationale.strip():
+        return {"status": "error", "answer": "Pick what should change, or say in your own words what was wrong."}
+    term = memory.detect_term(kind, question)
+    rule = (f"When I say “{term}”, {words}." if term and words else f"For questions like this, {words}." if words
+            else rationale.strip())
+    plan = None
+    if mode == "auto":
+        try:
+            plan = generate_json(CORRECT_SYSTEM, f"Question: {question}\nOriginal SQL:\n{original_sql or '(none)'}\n"
+                                                 f"What was wrong ({memory.TYPES.get(kind, 'other')}): {rule}\n"
+                                                 f"The user's words: {rationale or '(none)'}")
+            plan["sql"] = validate_sql(plan.get("sql", ""))
+        except (LLMError, ValidationError):
+            plan = None
+    if plan is None and override:
+        plan = plan_offline(question, history, override)
+    if not plan or plan.get("action", "sql") != "sql" or not plan.get("sql"):
+        return {"status": "unavailable", "answer": "I couldn't work out the corrected calculation. Try describing the change "
+                                                    "with one of the options, or rephrase the question."}
+    draft = {"id": uuid.uuid4().hex[:10], "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+             "type": kind, "choice": choice, "choice_label": label, "question": question, "original_sql": original_sql,
+             "corrected_sql": plan["sql"], "rule": rule, "rationale": rationale.strip(), "override": override,
+             "term": term, "title": plan.get("title", ""),
+             "assumptions": plan.get("assumptions", []), "enabled": True}
+    result = ask(question, history, mode=mode, use_cache=False, corrections=[draft])
+    if result["status"] != "success":
+        return {"status": result["status"], "answer": result["answer"], "result": result}
+    draft["corrected_sql"] = result["sql"]  # as validated and run
+    return {"status": "success", "correction": draft, "result": result}
