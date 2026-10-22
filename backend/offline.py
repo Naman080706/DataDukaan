@@ -123,7 +123,7 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
         sql = ("SELECT ROUND(SUM(line_value), 2) AS total_transaction_value_gbp, "
                "ROUND(SUM(line_value) FILTER (WHERE line_type IN ('sale', 'cancellation')), 2) AS net_sales_value_gbp "
                "FROM transactions" + (" WHERE " + " AND ".join(filters) if filters else ""))
-        assumptions.append("Total transaction value adds up every line, including stock adjustments and bad-debt entries; "
+        assumptions.append("Total transaction value adds up everything in the records, including stock write-offs and bad-debt entries; "
                            "net sales value is sales minus returns.")
         return {"action": "sql", "sql": sql, "assumptions": assumptions, "title": "Total transaction value vs net sales value"}
 
@@ -179,11 +179,11 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
     expr, alias, base, label = MEASURES[measure]
     where = [base] + filters
     if measure in ("returned_units", "return_invoices"):
-        assumptions.append("Returns are lines on cancellation invoices (numbers starting with C).")
+        assumptions.append("Returns are items on cancellation invoices (invoice numbers starting with C).")
     if measure == "net":
-        assumptions.append("Net revenue is sales minus returns; cancellation lines count as negative.")
+        assumptions.append("Net revenue is sales minus returns.")
     if measure == "gross":
-        assumptions.append("Only sale lines are counted; cancelled invoices, stock adjustments and £0 lines are left out.")
+        assumptions.append("Only sales are counted; cancelled orders, stock write-offs and free items are left out.")
 
     if dim is None:
         sql = f"SELECT {expr} AS {alias} FROM transactions WHERE {' AND '.join(where)}"
@@ -194,9 +194,9 @@ def plan_offline(question: str, history: list[dict] | None = None) -> dict | Non
     if dim_filter:
         where.append(dim_filter)
     if dim == "product":
-        assumptions.append("Postage, fees, manual adjustments and other non-product codes are left out of product rankings.")
+        assumptions.append("Postage, fees and manual adjustments are left out of product rankings.")
     if dim == "customer":
-        assumptions.append("Lines without a customer ID are left out of customer rankings.")
+        assumptions.append("Sales without a customer ID are left out of customer rankings.")
 
     if is_time:
         order, limit = "1 ASC", 200

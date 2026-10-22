@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronDown } from "lucide-react";
-import { AskResponse, Cell, downloadCSV, formatCell } from "../api";
+import { AskResponse, Cell, downloadCSV, formatCell, prettyColumn } from "../api";
 
 type Tab = "chart" | "table" | "sql" | "steps";
-const TAB_LABEL: Record<Tab, string> = { chart: "Chart", table: "Table", sql: "SQL", steps: "Agent steps" };
+const TAB_LABEL: Record<Tab, string> = { chart: "Chart", table: "Table", sql: "How it was worked out", steps: "Step by step" };
 
 export default function ResultView({ r }: { r: AskResponse }) {
   const hasChart = r.chart_type !== "none";
@@ -27,14 +27,22 @@ export default function ResultView({ r }: { r: AskResponse }) {
           </button>
         ))}
         <span className="ml-auto pb-2 text-[13px] text-muted">
-          {r.rows.length} {r.rows.length === 1 ? "row" : "rows"}
-          {r.truncated ? " (first 500 shown)" : ""}, {r.attempts === 1 ? "first try" : `${r.attempts} attempts`}, {(r.latency_ms / 1000).toFixed(1)} s
+          {r.rows.length} {r.rows.length === 1 ? "result" : "results"}
+          {r.truncated ? " (first 500 shown)" : ""}, answered in {(r.latency_ms / 1000).toFixed(1)} s
         </span>
       </div>
       <div className="pt-4">
         {tab === "table" && <SortableTable columns={r.columns} rows={r.rows} />}
         {tab === "chart" && <AutoChart r={r} />}
-        {tab === "sql" && <SqlInspector sql={r.sql ?? ""} />}
+        {tab === "sql" && (
+          <div>
+            <p className="mb-3 max-w-2xl text-[14px] leading-relaxed text-muted">
+              This is the exact calculation DataDukaan ran on the sales records, written in SQL, the standard language for databases. You don't
+              need to read it; it's here so anyone can check the answer.
+            </p>
+            <SqlInspector sql={r.sql ?? ""} />
+          </div>
+        )}
         {tab === "steps" && <Steps r={r} />}
       </div>
     </div>
@@ -63,7 +71,7 @@ export function SortableTable({ columns, rows, max = 200, exportable = true }: {
               {columns.map((c, i) => (
                 <th key={c + i} aria-sort={sort?.col === i ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
                   <button onClick={() => setSort({ col: i, dir: sort?.col === i && sort.dir === -1 ? 1 : -1 })} className="hover:text-ink">
-                    {c.replace(/_/g, " ")}
+                    {prettyColumn(c)}
                     {sort?.col === i && <ChevronDown size={12} className={`ml-0.5 inline ${sort.dir === 1 ? "rotate-180" : ""}`} />}
                   </button>
                 </th>
@@ -105,7 +113,7 @@ function AutoChart({ r }: { r: AskResponse }) {
   return (
     <figure>
       <figcaption className="mb-2 text-[13px] text-muted">
-        {valueCol.replace(/_/g, " ")} by {(useDesc ? r.columns[descIdx] : r.columns[0]).replace(/_/g, " ")}, picked as a {r.chart_type} chart from the shape of the result
+        {prettyColumn(valueCol)} by {prettyColumn(useDesc ? r.columns[descIdx] : r.columns[0]).toLowerCase()}
       </figcaption>
       <ResponsiveContainer width="100%" height={Math.max(240, r.chart_type === "bar" ? data.length * 30 + 40 : 300)}>
         {r.chart_type === "line" ? (
@@ -114,7 +122,7 @@ function AutoChart({ r }: { r: AskResponse }) {
             <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={{ stroke: "#1D2521" }} />
             <YAxis tick={axis} tickFormatter={compact} tickLine={false} axisLine={false} width={56} />
             <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 2, borderColor: "#DED0AB", fontFamily: "Archivo" }} />
-            <Line type="monotone" dataKey="value" name={valueCol} stroke="#009B77" strokeWidth={2.5} dot={{ r: 3, fill: "#009B77" }} />
+            <Line type="monotone" dataKey="value" name={prettyColumn(valueCol)} stroke="#009B77" strokeWidth={2.5} dot={{ r: 3, fill: "#009B77" }} />
           </LineChart>
         ) : (
           <BarChart data={data} layout="vertical" margin={{ left: 4, right: 24 }}>
@@ -122,7 +130,7 @@ function AutoChart({ r }: { r: AskResponse }) {
             <XAxis type="number" tick={axis} tickFormatter={compact} tickLine={false} axisLine={false} />
             <YAxis type="category" dataKey="label" width={200} tick={axis} interval={0} tickLine={false} axisLine={{ stroke: "#1D2521" }} />
             <Tooltip formatter={(v: number) => fmt(v)} cursor={{ fill: "#B2E1D6" }} contentStyle={{ borderRadius: 2, borderColor: "#DED0AB", fontFamily: "Archivo" }} />
-            <Bar dataKey="value" name={valueCol} fill="#009B77" barSize={16} />
+            <Bar dataKey="value" name={prettyColumn(valueCol)} fill="#009B77" barSize={16} />
           </BarChart>
         )}
       </ResponsiveContainer>
@@ -136,7 +144,7 @@ export function SqlInspector({ sql, note = true }: { sql: string; note?: boolean
     <div>
       <pre className="carbon-copy">{sql}</pre>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
-        {note && <span>Ran on a read-only connection after the validator confirmed it is a single SELECT.</span>}
+        {note && <span>It only read the records; nothing was changed.</span>}
         <button
           onClick={() => {
             navigator.clipboard.writeText(sql);
@@ -153,38 +161,47 @@ export function SqlInspector({ sql, note = true }: { sql: string; note?: boolean
 }
 
 const STEP_LABEL: Record<string, string> = {
-  get_schema: "Loaded the table layout and counting rules",
-  generate_sql: "Wrote SQL",
-  inject_fault: "Demo mode broke the SQL on purpose",
-  validate_sql: "Checked the SQL is safe",
-  execute_readonly_sql: "Ran it on the read-only ledger",
-  inspect_error: "Read the error and worked out a fix",
-  summarise: "Wrote the answer from the returned rows",
-  clarify: "Asked you to clarify",
-  clarify_check: "Skipped an unneeded question: the counting rules already define it",
-  saved_answer: "Found a saved answer to the same question",
-  offline_engine: "Switched to the offline rule engine",
-  refuse: "Refused the request",
+  get_schema: "Read the counting rules",
+  generate_sql: "Worked out how to calculate it",
+  inject_fault: "Demo: broke the calculation on purpose",
+  validate_sql: "Checked it only reads the records, never changes them",
+  execute_readonly_sql: "Ran the calculation on the sales records",
+  inspect_error: "Spotted the problem and fixed it",
+  summarise: "Wrote the answer from the results",
+  clarify: "Asked you which one you meant",
+  clarify_check: "Skipped an unneeded question, because the counting rules already answer it",
+  saved_answer: "Reused the working from an earlier identical question",
+  offline_engine: "Used backup mode (no AI)",
+  refuse: "Turned down the request",
 };
 const STEP_COLOR: Record<string, string> = { ok: "bg-ledger", error: "bg-stamp", blocked: "bg-stamp", warn: "bg-carbon" };
 
 function Steps({ r }: { r: AskResponse }) {
+  const [details, setDetails] = useState(false);
   return (
-    <ol className="space-y-3">
-      {r.trace.map((s, i) => (
-        <li key={i} className="grid grid-cols-[28px_1fr] gap-2">
-          <span className="narrow pt-0.5 text-right text-[15px] font-bold text-muted">{i + 1}</span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[14px] font-medium">
-              <span className={`h-2 w-2 rounded-full ${STEP_COLOR[s.status] ?? "bg-muted"}`} aria-hidden />
-              {STEP_LABEL[s.tool] ?? s.tool}
-              <code className="font-mono text-[11.5px] font-normal text-muted">{s.tool}()</code>
+    <div>
+      <ol className="space-y-3">
+        {r.trace.map((s, i) => (
+          <li key={i} className="grid grid-cols-[28px_1fr] gap-2">
+            <span className="narrow pt-0.5 text-right text-[15px] font-bold text-muted">{i + 1}</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[14px] font-medium">
+                <span className={`h-2 w-2 rounded-full ${STEP_COLOR[s.status] ?? "bg-muted"}`} aria-hidden />
+                {STEP_LABEL[s.tool] ?? s.tool}
+              </div>
+              {details && s.detail && (
+                <div className="mt-0.5 whitespace-pre-wrap break-words font-mono text-[12px] leading-relaxed text-muted">{s.detail}</div>
+              )}
             </div>
-            {s.detail && <div className="mt-0.5 whitespace-pre-wrap break-words font-mono text-[12px] leading-relaxed text-muted">{s.detail}</div>}
-          </div>
-        </li>
-      ))}
-      {r.model && <li className="pl-9 text-[13px] text-muted">{r.source === "offline" ? "Answered without AI by the offline rule engine" : `Model used: ${r.model}`}</li>}
-    </ol>
+          </li>
+        ))}
+      </ol>
+      <button onClick={() => setDetails(!details)} className="mt-4 text-[13px] font-medium text-carbon-deep underline-offset-2 hover:underline">
+        {details ? "Hide technical details" : "Show technical details"}
+      </button>
+      {details && r.model && (
+        <p className="mt-1 text-[13px] text-muted">{r.source === "offline" ? "Answered without AI, in backup mode." : `AI model used: ${r.model}`}</p>
+      )}
+    </div>
   );
 }

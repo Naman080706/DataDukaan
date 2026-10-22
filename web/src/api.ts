@@ -140,3 +140,23 @@ export function formatCell(col: string, v: Cell): string {
   }
   return String(v);
 }
+
+// Turn database column names into words a shop manager would use.
+const COLUMN_WORDS: Record<string, string> = {
+  stock_code: "Product code",
+  description: "Product",
+  customer_id: "Customer ID",
+  country: "Country",
+  invoice: "Invoice",
+  month: "Month",
+  quarter: "Quarter",
+  year: "Year",
+};
+
+export function prettyColumn(col: string): string {
+  if (COLUMN_WORDS[col]) return COLUMN_WORDS[col];
+  const money = /_gbp$/i.test(col);
+  const words = col.replace(/_gbp$/i, "").replace(/_/g, " ").trim();
+  const text = words.charAt(0).toUpperCase() + words.slice(1);
+  return money ? `${text} (£)` : text;
+}

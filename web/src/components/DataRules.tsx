@@ -8,9 +8,9 @@ const RULES: { term: string; body: string }[] = [
   { term: "Things that aren't products", body: "Postage, manual adjustments, bank charges, Amazon fees, samples, discounts, test codes and gift vouchers are left out of product rankings and kept in transaction totals." },
   { term: "Stock write-offs and bad debt", body: "Negative quantities without a C invoice are damaged or lost stock at £0. Invoices starting with A are bad-debt adjustments. Neither is a sale or a return." },
   { term: "Money", body: "Line value is quantity times unit price, in pounds sterling, rounded to the penny." },
-  { term: "Dates", body: "Years are calendar years. The data ends on 9 December 2011, part-way through a quarter, so “last quarter” could mean July to September (the last complete quarter) or October to 9 December. The agent asks which one you mean; “last month” works the same way." },
-  { term: "Vague questions", body: "If the answer depends on a measure you didn't name, such as “best customers” or “top products”, the agent asks which one you mean instead of picking for you." },
-  { term: "Safety", body: "The agent can only read. Each query is parsed before it runs; anything that writes, runs more than one statement, opens files or reaches other tables is refused, and the database itself is opened read-only." },
+  { term: "Dates", body: "Years are calendar years. The data ends on 9 December 2011, part-way through a quarter, so “last quarter” could mean July to September (the last complete quarter) or October to 9 December. DataDukaan asks which one you mean; “last month” works the same way." },
+  { term: "Vague questions", body: "If the answer depends on a measure you didn't name, such as “best customers” or “top products”, DataDukaan asks which one you mean instead of picking for you." },
+  { term: "Safety", body: "DataDukaan can only look at the sales records. Every calculation is checked before it runs, and anything that would change, delete or copy the records is refused." },
 ];
 
 export default function DataRules() {
@@ -26,7 +26,7 @@ export default function DataRules() {
       <section className="sheet px-5 py-7 sm:px-8">
         <h1 className="wide max-w-3xl text-[clamp(26px,3.6vw,38px)] font-extrabold leading-[1.05] tracking-tight">How the shop's messy records are counted</h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
-          The same rules go into the agent's instructions and into the hand-written SQL the tests are checked against, so both always use one definition.
+          DataDukaan follows these rules for every answer, and our answer key for the trap tests uses the same rules, so both always count things the same way.
         </p>
         <dl className="mt-8 border-t-[3px] border-double border-ink">
           {RULES.map((r) => (
@@ -38,12 +38,14 @@ export default function DataRules() {
         </dl>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <section className="sheet min-w-0 px-5 py-6 sm:px-8">
-          <h2 className="text-lg font-bold">The exact instructions the agent gets</h2>
+      <details className="sheet group px-5 py-5 sm:px-8">
+        <summary className="cursor-pointer text-[15px] font-semibold text-carbon-deep">For analysts: the exact rules and how the data is stored</summary>
+      <div className="mt-5 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        <section className="min-w-0">
+          <h2 className="text-lg font-bold">The exact instructions the AI gets</h2>
           <pre className="carbon-copy mt-3 max-h-[520px] whitespace-pre-wrap">{rules ? `${rules.data_rules}\n\n${rules.ambiguity_rules}` : "Loading…"}</pre>
         </section>
-        <section className="sheet min-w-0 px-5 py-6 sm:px-8">
+        <section className="min-w-0">
           <h2 className="text-lg font-bold">The transactions table</h2>
           {schema && <p className="mt-1 text-[13px] text-muted">{schema.row_count.toLocaleString("en-GB")} rows, one per invoice line</p>}
           <table className="ledger mt-3 w-full text-[13.5px]">
@@ -65,6 +67,7 @@ export default function DataRules() {
           {rules && <p className="mt-3 text-[13px] leading-relaxed text-muted">Codes treated as non-products: {rules.non_product_codes.join(", ")}, and any code starting with gift_, TEST or ADJUST.</p>}
         </section>
       </div>
+      </details>
     </div>
   );
 }

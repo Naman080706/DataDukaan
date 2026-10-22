@@ -30,7 +30,7 @@ export function stampFor(e: Entry): StampKind | null {
   if (r.status === "unavailable") return { text: "Can't answer", color: "text-stamp" };
   if (r.status !== "success") return { text: "Failed", color: "text-stamp" };
   if (r.attempts > 1) return { text: "Fixed & re-run", color: "text-gold-deep" };
-  if (r.source === "offline") return { text: "Answered offline", color: "text-ledger" };
+  if (r.source === "offline") return { text: "Answered (backup)", color: "text-ledger" };
   if (r.source === "saved") return { text: "Saved answer", color: "text-ledger" };
   return { text: "Answered", color: "text-ledger" };
 }
@@ -225,11 +225,11 @@ export default function Workspace({ email }: { email: string }) {
         <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-3 pt-2 text-[13px] text-muted">
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={injectFault} onChange={(e) => setInjectFault(e.target.checked)} className="accent-carbon-deep" />
-            Demo: break the first SQL, to watch the agent fix it
+            Demo: make the first attempt fail, to watch it recover
           </label>
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={simulateOutage} onChange={(e) => setSimulateOutage(e.target.checked)} className="accent-carbon-deep" />
-            Demo: pretend the AI is down, to use the offline engine
+            Demo: answer without the AI service (backup mode)
           </label>
         </div>
       </form>
@@ -244,8 +244,8 @@ function EmptyBill({ onAsk }: { onAsk: (q: string) => void }) {
         What do you want to know about the shop's sales?
       </h1>
       <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
-        Two years of invoices from a UK online gift shop. Cancelled orders, returns and customers without an ID are counted the same way every
-        time, and every answer shows the SQL that produced it.
+        Two years of sales from a UK online gift shop. Cancelled orders, returns and customers without an ID are counted the same way every
+        time, and every answer shows what was counted.
       </p>
       <div className="margin-rule mt-8">
         <p className="mb-1 text-sm font-semibold">Start with one of these</p>
@@ -289,11 +289,11 @@ function Bill({
 
       {!r && !entry.error && (
         <div className="mt-6 flex items-center gap-3 text-[15px] text-muted">
-          <Loader2 className="animate-spin text-carbon-deep" size={18} /> Reading the question, writing SQL and running it on the ledger…
+          <Loader2 className="animate-spin text-carbon-deep" size={18} /> Working out the answer…
         </div>
       )}
 
-      {entry.error && <p className="mt-5 text-[15px] text-stamp">The server didn't respond: {entry.error}. Check that the API is running, then ask again.</p>}
+      {entry.error && <p className="mt-5 text-[15px] text-stamp">Couldn't get an answer: {entry.error}. Check your connection and ask again.</p>}
 
       {r && (
         <>
@@ -310,7 +310,6 @@ function Bill({
             </div>
           )}
 
-          {(r.status === "refused" || r.status === "blocked") && r.sql && <pre className="carbon-copy mt-5">{r.sql}</pre>}
 
           {r.status === "success" && (
             <>

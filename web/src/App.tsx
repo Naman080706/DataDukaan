@@ -102,7 +102,7 @@ export default function App() {
       </main>
       <footer className="mx-auto w-full max-w-6xl px-4 pb-6 text-xs leading-relaxed text-muted sm:px-6">
         Data: Online Retail II, UCI Machine Learning Repository, CC BY 4.0. A UK online gift shop, December 2009 to December 2011, prices in
-        pounds sterling. Answers are written by an AI model from read-only SQL, so check the SQL before acting on a number.
+        pounds sterling. Answers are written with AI, so check the figures before acting on them.
       </footer>
     </div>
   );
@@ -131,13 +131,13 @@ function ProfileLink({ email, active }: { email: string; active: boolean }) {
 }
 
 function DatasetStatus({ health }: { health: Health | null }) {
-  if (!health) return <span className="text-[13px] text-muted">Opening the ledger…</span>;
-  if (health.status !== "ok") return <span className="text-[13px] font-medium text-stamp">Ledger offline. Check the API server.</span>;
+  if (!health) return <span className="text-[13px] text-muted">Loading…</span>;
+  if (health.status !== "ok") return <span className="text-[13px] font-medium text-stamp">Can't reach the sales records right now.</span>;
   return (
     <span className="text-[13px] leading-tight text-muted sm:text-right">
-      <span className="narrow text-[17px] font-bold text-ink">{health.rows?.toLocaleString("en-GB")}</span> invoice lines
+      <span className="narrow text-[17px] font-bold text-ink">{health.rows?.toLocaleString("en-GB")}</span> sales records
       <br />
-      read-only{!health.llm_configured && <span className="text-stamp">, AI key missing</span>}
+      Dec 2009 to Dec 2011{!health.llm_configured && <span className="text-stamp">, AI not connected</span>}
     </span>
   );
 }

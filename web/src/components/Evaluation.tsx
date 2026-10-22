@@ -57,15 +57,15 @@ export default function Evaluation() {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">
             <h1 className="wide text-[clamp(26px,3.6vw,38px)] font-extrabold leading-[1.05] tracking-tight">
-              {suite.length || 15} questions written to trip the agent up
+              {suite.length || 15} questions written to catch DataDukaan out
             </h1>
             <p className="mt-3 text-[15px] leading-relaxed text-muted">
               Each question hides a common mistake on this data: cancelled invoices, returns, customers without an ID, vague wording, or a
-              request to delete data. These tests check whether the AI agent avoids them on its own.
+              request to delete data. These tests check that DataDukaan avoids them.
             </p>
             <ol className="mt-3 list-decimal space-y-1 pl-5 text-[14px] leading-relaxed text-muted">
-              <li>For every question we wrote the correct SQL by hand and checked it against the data. That is the answer key.</li>
-              <li>The agent answers the same question by itself, without seeing the answer key.</li>
+              <li>For every question we worked out the correct answer ourselves. That's the answer key.</li>
+              <li>DataDukaan answers the same question on its own, without seeing the answer key.</li>
               <li>
                 It passes if its result matches: totals to the penny, rankings by the top 5. Vague questions pass only if it asks back,
                 and the delete request only if it refuses.
@@ -82,27 +82,26 @@ export default function Evaluation() {
           <span className="text-sm font-semibold">Testing</span>
           {(["llm", "offline"] as EvalMode[]).map((m) => (
             <button key={m} role="tab" aria-selected={mode === m} disabled={!!running} onClick={() => setMode(m)} className="tab">
-              {m === "llm" ? "The AI agent" : "The offline engine (no AI)"}
+              {m === "llm" ? "With AI" : "Backup mode (no AI)"}
             </button>
           ))}
         </div>
         {mode === "offline" && (
           <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-muted">
-            The offline engine is the backup for when every AI model is unavailable. It was written with these questions in view, so a high
-            score here shows it covers them, not that it handles any wording.
+            Backup mode answers when the AI service is unavailable. It was built with these questions in mind, so a high score here shows it covers them, not that it understands any wording.
           </p>
         )}
 
         <dl className="mt-6 flex flex-wrap gap-x-12 gap-y-4 border-y-[3px] border-double border-ink py-4">
           <Figure value={results.length ? `${passed}/${results.length}` : "–"} label="tests passed" />
-          <Figure value={results.length ? `${Math.round((passed / results.length) * 100)}%` : "–"} label="execution accuracy" />
+          <Figure value={results.length ? `${Math.round((passed / results.length) * 100)}%` : "–"} label="accuracy" />
           <Figure value={amb.length ? `${amb.filter((r) => r.passed).length}/${amb.length}` : "–"} label="vague questions asked back" />
         </dl>
         <p className="mt-3 text-[13px] text-muted">
           {liveCount
             ? `Live run in progress or just finished: ${liveCount} of ${suite.length} done.`
             : saved
-              ? `Showing the run saved on ${new Date(saved.run_at).toLocaleString("en-GB")}. Running the tests again calls the live agent, and results can vary slightly between runs.`
+              ? `Showing the run saved on ${new Date(saved.run_at).toLocaleString("en-GB")}. Running them again asks DataDukaan live, and results can vary slightly between runs.`
               : "No saved run yet. Run the tests to see results."}
         </p>
 
@@ -159,7 +158,7 @@ export default function Evaluation() {
                         <div className="mt-4 grid gap-6 lg:grid-cols-2">
                           {t.reference_sql && (
                             <div className="min-w-0">
-                              <p className="mb-1.5 text-sm font-semibold">Answer key: our hand-written SQL and its result</p>
+                              <p className="mb-1.5 text-sm font-semibold">Answer key: our own calculation and its result</p>
                               <SqlInspector sql={t.reference_sql} note={false} />
                               {r?.expected && (
                                 <div className="mt-3">
@@ -170,7 +169,7 @@ export default function Evaluation() {
                           )}
                           {r?.agent_sql && (
                             <div className="min-w-0">
-                              <p className="mb-1.5 text-sm font-semibold">What the agent wrote on its own, and its result</p>
+                              <p className="mb-1.5 text-sm font-semibold">DataDukaan's calculation and its result</p>
                               <SqlInspector sql={r.agent_sql} note={false} />
                               {r.actual?.columns.length > 0 && (
                                 <div className="mt-3">

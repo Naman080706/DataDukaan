@@ -4,11 +4,11 @@ import type { Session } from "../auth";
 const TRUST: { term: string; body: string }[] = [
   {
     term: "Counted the same way every time",
-    body: "Cancelled invoices, returns, customers without an ID and postage lines each have one written rule, and every answer follows it.",
+    body: "Cancelled invoices, returns, customers without an ID and postage charges each have one written rule, and every answer follows it.",
   },
   {
     term: "Shows its working",
-    body: "Every answer comes with the exact SQL that produced it, the rows it returned, and each step the agent took.",
+    body: "Every answer comes with the figures behind it and a plain note on what was counted and what was left out.",
   },
   {
     term: "Asks when a question is vague",
@@ -16,16 +16,16 @@ const TRUST: { term: string; body: string }[] = [
   },
   {
     term: "Checked against an answer key",
-    body: "15 trap questions with hand-written correct SQL. Gemini, Groq, the offline engine and the full chain all pass 15 of 15.",
+    body: "We wrote 15 tricky questions and worked out the correct answers ourselves. DataDukaan gets all 15 right.",
   },
   {
-    term: "Read-only, and still works when the AI doesn't",
-    body: "It can't change the data. If every AI model is rate-limited, a rule engine answers common questions without AI.",
+    term: "Looks, never touches",
+    body: "It can read your sales records but never change or delete them. If the AI service is busy, it can still answer common questions.",
   },
 ];
 
 export default function Landing({ session, health }: { session: Session | null; health: Health | null }) {
-  const cta = session ? { href: "#/ask", label: "Open the ledger" } : { href: "#/signin", label: "Sign in to start" };
+  const cta = session ? { href: "#/ask", label: "Start asking" } : { href: "#/signin", label: "Sign in to start" };
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
@@ -36,7 +36,7 @@ export default function Landing({ session, health }: { session: Session | null; 
           </span>
         </a>
         <a href={cta.href} className="text-[15px] font-semibold text-carbon-deep underline-offset-4 hover:underline">
-          {session ? "Open the ledger" : "Sign in"}
+          {session ? "Start asking" : "Sign in"}
         </a>
       </header>
 
@@ -44,15 +44,15 @@ export default function Landing({ session, health }: { session: Session | null; 
         <div>
           <h1 className="wide text-[clamp(36px,5.6vw,64px)] font-extrabold leading-[0.98] tracking-tight">Ask your shop's sales ledger anything.</h1>
           <p className="mt-6 max-w-xl text-[18px] leading-relaxed text-ink/80">
-            Type a question in plain English. DataDukaan writes the SQL, runs it on two years of real invoices, and shows you the answer, the
-            numbers behind it and exactly how it got there.
+            Type a question the way you'd ask a colleague. DataDukaan works it out from two years of real sales records and shows you the
+            answer, the figures behind it, and what it counted.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
             <a href={cta.href} className="btn-carbon px-6 py-3 text-[16px]">
               {cta.label}
             </a>
             <span className="text-[14px] text-muted">
-              {health?.rows ? `${health.rows.toLocaleString("en-GB")} invoice lines, Dec 2009 to Dec 2011` : "UK online gift shop, Dec 2009 to Dec 2011"}
+              {health?.rows ? `${health.rows.toLocaleString("en-GB")} sales records, Dec 2009 to Dec 2011` : "UK online gift shop, Dec 2009 to Dec 2011"}
             </span>
           </div>
         </div>
@@ -66,10 +66,10 @@ export default function Landing({ session, health }: { session: Session | null; 
             <br />
             invoices were cancelled. They start with “C” and are kept out of sales figures.
           </p>
-          <pre className="carbon-copy mt-5 text-[12px]">
-            {"SELECT COUNT(DISTINCT invoice) AS cancelled_invoices\nFROM transactions\nWHERE is_cancelled"}
-          </pre>
-          <figcaption className="mt-3 text-[13px] text-muted">Ran on a read-only copy of the data in a few milliseconds.</figcaption>
+          <p className="margin-rule mt-5 text-[14px] leading-relaxed text-muted">
+            Counted every order whose invoice number starts with “C”, the shop's mark for a cancellation. Each order is counted once, even if
+            it had several items.
+          </p>
         </figure>
       </section>
 
@@ -79,7 +79,7 @@ export default function Landing({ session, health }: { session: Session | null; 
             Why you can trust the numbers
           </h2>
           <p className="mt-3 max-w-2xl text-[16px] leading-relaxed text-muted">
-            Retail data is messy. Returns are recorded as negative quantities, cancelled orders stay in the books, and one in five lines has no
+            Shop records are messy. Returns are mixed in with sales, cancelled orders stay in the books, and one in five sales has no
             customer. A confident wrong answer is worse than none.
           </p>
           <dl className="mt-8 border-t-[3px] border-double border-ink">
@@ -95,7 +95,7 @@ export default function Landing({ session, health }: { session: Session | null; 
 
       <section className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6 px-4 py-14 sm:px-6">
         <p className="wide max-w-xl text-[clamp(22px,2.8vw,30px)] font-extrabold leading-tight tracking-tight">
-          Try “Which products were returned most?” and see what it does with the negative quantities.
+          Try “Which products were returned most?” and see how it tells returns apart from sales.
         </p>
         <a href={cta.href} className="btn-carbon px-6 py-3 text-[16px]">
           {cta.label}
@@ -104,8 +104,8 @@ export default function Landing({ session, health }: { session: Session | null; 
 
       <footer className="border-t border-rule">
         <div className="mx-auto max-w-6xl px-4 py-6 text-xs leading-relaxed text-muted sm:px-6">
-          Data: Online Retail II, UCI Machine Learning Repository, CC BY 4.0. Built for NEXAI 2026. Answers are written by an AI model from
-          read-only SQL, so check the SQL before acting on a number.
+          Data: Online Retail II, UCI Machine Learning Repository, CC BY 4.0. Built for NEXAI 2026. Answers are written with AI, so check the
+          figures before acting on them.
         </div>
       </footer>
     </div>

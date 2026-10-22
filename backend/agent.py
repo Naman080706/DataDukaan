@@ -29,7 +29,10 @@ Respond with JSON only, one of:
 {{"action": "sql", "sql": "<single SELECT>", "assumptions": ["<rule or assumption applied>", ...], "title": "<short result title>"}}
 {{"action": "clarify", "question": "<one clarifying question>", "options": ["<option 1>", "<option 2>", ...]}}
 {{"action": "refuse", "reason": "<why>"}}
-Use readable column aliases (e.g. net_revenue_gbp, returned_units). Never invent tables or columns."""
+Use readable column aliases (e.g. net_revenue_gbp, returned_units). Never invent tables or columns.
+The "assumptions", "title", clarifying "question", "options" and refusal "reason" are shown to a shop manager with no
+technical background: write them in plain everyday English. Never mention SQL, tables, column names, flags or code values
+(write "products only, not postage or fees", not "is_product = TRUE"; write "returns", not "line_type = 'cancellation'")."""
 
 FIX_SYSTEM = f"""You fix DuckDB SQL that failed. Same schema and rules as before:
 
@@ -42,6 +45,8 @@ Respond with JSON only: {{"diagnosis": "<one line: what went wrong>", "sql": "<c
 SUMMARY_SYSTEM = """You write a 1-3 sentence plain-English answer for a store manager.
 Use ONLY numbers that appear in the provided result rows; never invent or estimate values.
 Money is GBP: write it as £1,234.56. Mention key assumptions briefly. If the result is empty, say so.
+The reader has no technical background: never mention SQL, queries, tables, rows, column names, flags or code values
+such as is_product or line_type. Say "products" or "returns", not the database terms.
 Respond with JSON only: {"answer": "<text>"}"""
 
 
@@ -138,10 +143,10 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     if plan is None:
         resp["status"] = "unavailable"
         resp["answer"] = (
-            "The AI models are unavailable and the offline engine doesn't recognise this question. "
-            "Try naming a measure (revenue, units, orders, returns), a breakdown (product, country, customer, month) "
-            "and a period (a year, a month like March 2011, or last quarter)."
-            if source == "offline" else "The AI models are unavailable right now. Try again in a minute."
+            "The AI service is busy and backup mode doesn't recognise this question. "
+            "Try saying what to count (revenue, units, orders or returns), how to split it (by product, country, customer "
+            "or month) and when (a year, a month like March 2011, or last quarter)."
+            if source == "offline" else "The AI service is busy right now. Try again in a minute."
         )
         return _finish(resp, t0)
     resp["model"] = plan.get("_model") if source != "offline" else "offline rule engine"
@@ -176,7 +181,7 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
         except ValidationError as e:
             step("validate_sql", "blocked", str(e))
             if attempt == MAX_RETRIES or _is_write_attempt(str(e)):
-                resp.update(status="blocked", sql=sql, answer=f"Query rejected by the safety validator: {e}")
+                resp.update(status="blocked", sql=sql, answer="This was blocked for safety: DataDukaan can only look at the sales records, never change them.")
                 return _finish(resp, t0)
             sql = _fix(sql, f"Validator rejected the query: {e}", question, step)
             if sql is None:
@@ -190,7 +195,7 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
             err = str(e).splitlines()[0][:300]
             step("execute_readonly_sql", "error", err)
             if attempt == MAX_RETRIES:
-                resp.update(sql=sql, answer=f"The query failed after {MAX_RETRIES + 1} attempts: {err}")
+                resp.update(sql=sql, answer=f"DataDukaan couldn't work this out after {MAX_RETRIES + 1} tries. Try asking it a different way.")
                 return _finish(resp, t0)
             sql = _fix(sql, err, question, step)
             if sql is None:
@@ -198,7 +203,7 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     else:
         return _finish(resp, t0)
     if sql is None:
-        resp["answer"] = "Could not repair the query."
+        resp["answer"] = "DataDukaan couldn't work this out. Try asking it a different way."
         return _finish(resp, t0)
 
     resp.update(status="success", sql=sql, columns=result["columns"], rows=result["rows"],
