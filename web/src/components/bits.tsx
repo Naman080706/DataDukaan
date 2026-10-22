@@ -25,6 +25,8 @@ export function CountUp({ to, duration = 1400, className = "" }: { to: number; d
     const el = ref.current;
     if (!el || reduced()) return;
     let frame = 0;
+    // Background tabs and screenshot tools pause animation frames; make sure the real number still shows.
+    const settle = window.setTimeout(() => setValue(to), duration + 1500);
     const io = new IntersectionObserver(([e]) => {
       if (!e.isIntersecting) return;
       io.disconnect();
@@ -40,6 +42,7 @@ export function CountUp({ to, duration = 1400, className = "" }: { to: number; d
     return () => {
       io.disconnect();
       cancelAnimationFrame(frame);
+      window.clearTimeout(settle);
     };
   }, [to, duration]);
   return (
