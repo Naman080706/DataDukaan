@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { api, AskResponse, Turn } from "../api";
 import ResultView from "./ResultView";
+import type { DatasetProfile } from "../localdb";
+import { askLocal } from "../localAgent";
 import { loadSaved, loadSession, SavedAnalysis, saveSession, storeSaved } from "../storage";
 
 const SUGGESTED = [
@@ -35,7 +37,31 @@ export function stampFor(e: Entry): StampKind | null {
   return { text: "Answered", color: "text-ledger" };
 }
 
-export default function Workspace({ email }: { email: string }) {
+// Suggestions that fit the user's own file: sales questions for sales data, column-based ones otherwise.
+function suggestionsFor(p: DatasetProfile): string[] {
+  if (p.kind === "retail") {
+    const year = p.date_range[1] ? String(p.date_range[1]).slice(0, 4) : "this year";
+    return [
+      "What were the top 5 products by revenue?",
+      `Show monthly net revenue in ${year}`,
+      "Which products were returned most?",
+      "Who are our best customers?",
+      "What were the top 5 products by revenue in the best sales month of this year?",
+    ];
+  }
+  const num = p.columns.filter((c) => /^(DOUBLE|FLOAT|DECIMAL|HUGEINT|BIGINT|INTEGER|SMALLINT)/.test(c.type)).map((c) => c.name);
+  const text = p.columns.filter((c) => /^VARCHAR/.test(c.type)).map((c) => c.name);
+  const date = p.columns.find((c) => /^(DATE|TIMESTAMP)/.test(c.type))?.name;
+  const words = (n: string) => n.replace(/_/g, " ");
+  const out = ["How many rows are there, and what does each column contain?"];
+  if (num[0] && text[0]) out.push(`What is the average ${words(num[0])} for each ${words(text[0])}?`);
+  if (num[0] && text[0]) out.push(`Which ${words(text[0])} has the highest total ${words(num[0])}?`);
+  if (num[0] && date) out.push(`Show total ${words(num[0])} by month`);
+  if (text[1] ?? text[0]) out.push(`What are the 5 most common values of ${words(text[1] ?? text[0])}?`);
+  return out;
+}
+
+export default function Workspace({ email, dataset }: { email: string; dataset: DatasetProfile | null }) {
   const [restored] = useState(() => loadSession(email));
   const [entries, setEntries] = useState<Entry[]>(() => restored?.entries ?? []);
   const [selected, setSelected] = useState<number | null>(() => (restored?.entries.length ? restored.entries.length - 1 : null));
@@ -88,7 +114,10 @@ export default function Workspace({ email }: { email: string }) {
     setSelected(idx);
     setViewSaved(null);
     try {
-      const response = await api.ask(question, history(), conversationId, injectFault, simulateOutage ? "offline" : "auto");
+      const mode = simulateOutage ? "offline" : "auto";
+      const response = dataset
+        ? await askLocal(question, history(), dataset, injectFault, mode)
+        : await api.ask(question, history(), conversationId, injectFault, mode);
       setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, response } : e)));
     } catch (err) {
       setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, error: String(err) } : e)));
@@ -177,7 +206,7 @@ export default function Workspace({ email }: { email: string }) {
 
         {/* The bill: the current answer. */}
         <section className="min-w-0 px-5 py-6 sm:px-8">
-          {!current && <EmptyBill onAsk={submit} />}
+          {!current && <EmptyBill onAsk={submit} dataset={dataset} />}
           {current && (
             <Bill
               entry={current}
@@ -237,19 +266,25 @@ export default function Workspace({ email }: { email: string }) {
   );
 }
 
-function EmptyBill({ onAsk }: { onAsk: (q: string) => void }) {
+function EmptyBill({ onAsk, dataset }: { onAsk: (q: string) => void; dataset: DatasetProfile | null }) {
+  const list = dataset ? suggestionsFor(dataset) : SUGGESTED;
   return (
     <div className="max-w-2xl">
       <h1 className="wide text-[clamp(28px,4.2vw,44px)] font-extrabold leading-[1.02] tracking-tight">
-        What do you want to know about the shop's sales?
+        {dataset ? `What do you want to know about ${dataset.source}?` : "What do you want to know about the shop's sales?"}
       </h1>
       <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
-        Two years of sales from a UK online gift shop. Cancelled orders, returns and customers without an ID are counted the same way every
-        time, and every answer shows what was counted.
+        {dataset
+          ? `${dataset.row_count.toLocaleString("en-GB")} rows from your file, read in this browser. ${
+              dataset.kind === "retail"
+                ? "Returns and cancellations are kept apart from sales, the same way as the built-in data."
+                : "Each answer says how it read the columns it used."
+            }`
+          : "Two years of sales from a UK online gift shop. Cancelled orders, returns and customers without an ID are counted the same way every time, and every answer shows what was counted."}
       </p>
       <div className="margin-rule mt-8">
         <p className="mb-1 text-sm font-semibold">Start with one of these</p>
-        {SUGGESTED.map((s) => (
+        {list.map((s) => (
           <button key={s} onClick={() => onAsk(s)} className="ruled-line text-[15px]">
             {s}
           </button>

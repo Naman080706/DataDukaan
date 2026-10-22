@@ -23,14 +23,13 @@ let conn: AsyncDuckDBConnection | null = null;
 async function getConn(): Promise<AsyncDuckDBConnection> {
   if (!dbPromise) {
     dbPromise = (async () => {
+      // The ~35 MB engine is loaded from jsDelivr (pinned to the installed version) rather than shipped in the site.
       const duckdb = await import("@duckdb/duckdb-wasm");
-      const mvpWasm = (await import("@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url")).default;
-      const mvpWorker = (await import("@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url")).default;
-      const ehWasm = (await import("@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url")).default;
-      const ehWorker = (await import("@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url")).default;
-      const bundle = await duckdb.selectBundle({ mvp: { mainModule: mvpWasm, mainWorker: mvpWorker }, eh: { mainModule: ehWasm, mainWorker: ehWorker } });
-      const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING), new Worker(bundle.mainWorker!));
+      const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+      const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker!}");`], { type: "text/javascript" }));
+      const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING), new Worker(workerUrl));
       await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+      URL.revokeObjectURL(workerUrl);
       return db;
     })();
   }
@@ -47,7 +46,15 @@ function ext(name: string) {
 
 function csvEscape(v: unknown): string {
   if (v === null || v === undefined) return "";
-  if (v instanceof Date) return isNaN(v.getTime()) ? "" : v.toISOString().slice(0, 19).replace("T", " ");
+  if (v instanceof Date) {
+    // SheetJS gives dates in local time (and can be a second off), so format the local fields, not UTC.
+    if (isNaN(v.getTime())) return "";
+    const d = new Date(Math.round(v.getTime() / 1000) * 1000);
+    const p = (n: number) => String(n).padStart(2, "0");
+    const day = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    const time = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    return time === "00:00:00" ? day : `${day} ${time}`;
+  }
   const s = String(v);
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
@@ -143,7 +150,8 @@ function retailSql(m: Record<string, string>, nonProduct: string[]): string {
            (starts_with(invoice, 'C') OR (quantity < 0 AND price > 0)) AS is_cancelled,
            quantity < 0 AS is_negative_qty, customer_id IS NOT NULL AS has_customer,
            NOT (upper(stock_code) IN (${codes}) OR upper(stock_code) LIKE 'GIFT\\_%' ESCAPE '\\'
-                OR upper(stock_code) LIKE 'TEST%' OR upper(stock_code) LIKE 'ADJUST%') AS is_product,
+                OR upper(stock_code) LIKE 'TEST%' OR upper(stock_code) LIKE 'ADJUST%'
+                OR regexp_matches(lower(coalesce(description, '')), '\\b(shipping|delivery|postage|courier|freight|handling|service fee|bank charge|discount|gift card|voucher)\\b')) AS is_product,
            CASE WHEN starts_with(invoice, 'A') THEN 'bad_debt_adjustment'
                 WHEN starts_with(invoice, 'C') OR (quantity < 0 AND price > 0) THEN 'cancellation'
                 WHEN quantity < 0 THEN 'stock_adjustment'

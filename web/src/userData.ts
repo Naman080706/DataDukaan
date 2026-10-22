@@ -1,7 +1,6 @@
 // Which dataset a signed-in user is asking about: the built-in one, or their own file kept in this browser.
 // The file's bytes are stored in IndexedDB (per email) so it survives a reload; nothing is uploaded.
 import { useEffect, useState } from "react";
-import { api } from "./api";
 import { DatasetProfile, loadDataset } from "./localdb";
 
 const DB_NAME = "datadukaan-files";
@@ -34,10 +33,11 @@ const readFile = async (email: string): Promise<File | null> => {
 };
 const deleteFile = (email: string) => idbDo("readwrite", (s) => s.delete(email));
 
-let nonProduct: string[] | null = null;
+// Generic non-product codes for other people's files. The built-in dataset's own list (C2, C3, M, D...) means
+// something only in that data, so it isn't used here; shipping/fee descriptions are caught in localdb.ts too.
+const GENERIC_NON_PRODUCT = ["SHIP", "SHIPPING", "POST", "POSTAGE", "DELIVERY", "FREIGHT", "FEE", "FEES", "DISCOUNT", "TAX", "VAT", "GIFTCARD", "VOUCHER"];
 async function nonProductCodes() {
-  if (!nonProduct) nonProduct = (await api.rules()).non_product_codes;
-  return nonProduct;
+  return GENERIC_NON_PRODUCT;
 }
 
 // ---------- shared state (one per tab) ----------
@@ -89,7 +89,7 @@ async function restore(email: string) {
   }
 }
 
-export async function useFile(email: string, file: File) {
+export async function openFile(email: string, file: File) {
   set({ status: "loading", error: null });
   try {
     const profile = await loadDataset(file, await nonProductCodes());

@@ -7,17 +7,20 @@ import DataRules from "./components/DataRules";
 import Landing from "./components/Landing";
 import SignIn from "./components/SignIn";
 import Profile from "./components/Profile";
+import YourData from "./components/YourData";
+import { useUserData, UserDataState } from "./userData";
 import { loadProfile } from "./storage";
 
 // Hash routes keep this a static site (no server rewrites needed on Vercel).
-type Route = "home" | "signin" | "ask" | "tests" | "rules" | "profile";
+type Route = "home" | "signin" | "ask" | "data" | "tests" | "rules" | "profile";
 const ROUTES: Record<string, Route> = {
-  "": "home", "#/": "home", "#/signin": "signin", "#/ask": "ask", "#/tests": "tests", "#/rules": "rules", "#/profile": "profile",
+  "": "home", "#/": "home", "#/signin": "signin", "#/ask": "ask", "#/data": "data", "#/tests": "tests", "#/rules": "rules", "#/profile": "profile",
 };
-const NEEDS_SIGN_IN: Route[] = ["ask", "tests", "rules", "profile"];
+const NEEDS_SIGN_IN: Route[] = ["ask", "data", "tests", "rules", "profile"];
 
 const NAV: { route: Route; label: string }[] = [
   { route: "ask", label: "Ask" },
+  { route: "data", label: "Your data" },
   { route: "tests", label: "Trap tests" },
   { route: "rules", label: "How we count" },
 ];
@@ -36,6 +39,8 @@ export default function App() {
   const [route, setRoute] = useState<Route>(readRoute);
   const [session, setSession] = useState<Session | null>(currentSession);
   const [health, setHealth] = useState<Health | null>(null);
+  const userData = useUserData(session?.email ?? null);
+  const ownData = userData.active && userData.status === "ready" ? userData.profile : null;
 
   useEffect(() => {
     const onHash = () => setRoute(readRoute());
@@ -89,13 +94,20 @@ export default function App() {
             ))}
           </nav>
           <div className="flex items-end gap-6 pb-3">
-            <DatasetStatus health={health} />
+            <DatasetStatus health={health} userData={userData} />
             {session && <ProfileLink email={session.email} active={route === "profile"} />}
           </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-        {route === "ask" && session && <Workspace key={session.email} email={session.email} />}
+        {route === "ask" && session && (
+          <Workspace
+            key={`${session.email}:${ownData ? ownData.source : "builtin"}`}
+            email={ownData ? `${session.email}#${ownData.source}` : session.email}
+            dataset={ownData}
+          />
+        )}
+        {route === "data" && session && <YourData email={session.email} data={userData} />}
         {route === "tests" && <Evaluation />}
         {route === "rules" && <DataRules />}
         {route === "profile" && session && <Profile session={session} />}
@@ -130,7 +142,16 @@ function ProfileLink({ email, active }: { email: string; active: boolean }) {
   );
 }
 
-function DatasetStatus({ health }: { health: Health | null }) {
+function DatasetStatus({ health, userData }: { health: Health | null; userData: UserDataState }) {
+  if (userData.status === "loading") return <span className="text-[13px] text-muted">Opening your file…</span>;
+  if (userData.active && userData.profile)
+    return (
+      <a href="#/data" className="text-[13px] leading-tight text-muted hover:text-ink sm:text-right">
+        <span className="narrow text-[17px] font-bold text-ink">{userData.profile.row_count.toLocaleString("en-GB")}</span> rows
+        <br />
+        <span className="inline-block max-w-[180px] truncate align-bottom">your file: {userData.profile.source}</span>
+      </a>
+    );
   if (!health) return <span className="text-[13px] text-muted">Loading…</span>;
   if (health.status !== "ok") return <span className="text-[13px] font-medium text-stamp">Can't reach the sales records right now.</span>;
   return (

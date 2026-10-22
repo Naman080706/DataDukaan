@@ -155,6 +155,8 @@ const COLUMN_WORDS: Record<string, string> = {
   customer_id: "Customer ID",
   country: "Country",
   invoice: "Invoice",
+  invoice_date: "Date",
+  line_value: "Line value",
   month: "Month",
   quarter: "Quarter",
   year: "Year",
