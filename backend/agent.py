@@ -80,10 +80,10 @@ def choose_chart(columns: list[str], rows: list[list]) -> str:
     return "bar" if len(rows) <= 50 else "none"
 
 
-def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step) -> tuple[dict | None, str]:
+def _plan(question: str, history: list[dict], mode: str, use_cache: bool, step, owner: str | None = None) -> tuple[dict | None, str]:
     """Pick a plan. mode: 'auto' (saved -> AI -> offline), 'llm' (AI only), 'offline' (rule engine only)."""
     if mode == "auto" and use_cache and not history:
-        saved = cache.get(question)
+        saved = cache.get(question, owner)
         if saved:
             step("saved_answer", "ok", "Reused verified SQL from an earlier identical question; it is re-checked and re-run now")
             return {"action": "sql", **saved, "_model": saved.get("model")}, "saved"
@@ -124,7 +124,7 @@ def _check_ask_back(question: str, history: list[dict], user_msg: str, plan: dic
 
 
 def ask(question: str, history: list[dict] | None = None, inject_fault: bool = False, summarize: bool = True,
-        mode: str = "auto", use_cache: bool = True) -> dict:
+        mode: str = "auto", use_cache: bool = True, owner: str | None = None) -> dict:
     t0 = time.perf_counter()
     trace: list[dict] = []
     history = history or []
@@ -138,7 +138,7 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
         trace.append({"tool": tool, "status": status, "detail": detail})
 
     # 1-3. Understand the question; clarify or plan SQL.
-    plan, source = _plan(question, history, mode, use_cache and not inject_fault, step)
+    plan, source = _plan(question, history, mode, use_cache and not inject_fault, step, owner)
     resp["source"] = source
     if plan is None:
         resp["status"] = "unavailable"
@@ -213,7 +213,7 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
                 truncated=result["truncated"], chart_type=choose_chart(result["columns"], result["rows"]))
 
     if source == "ai" and mode == "auto" and use_cache and not history and not inject_fault:
-        cache.put(question, {**plan, "sql": sql, "model": resp["model"]})
+        cache.put(question, {**plan, "sql": sql, "model": resp["model"]}, owner)
 
     # 7. Summarise only the actual result.
     if summarize and source != "offline":

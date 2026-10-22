@@ -27,5 +27,5 @@ Plain-English questions about a shop's sales records become checked, read-only S
 
 ## Known gaps
 - The sign-in try limit and resend cooldown are per instance. Real limits need a shared store such as Vercel KV or Upstash.
-- Answers the AI writes are cached for all users. The SQL is re-checked on reuse, but the title and assumptions text are not.
+- Saved answers: the seed file is shared by everyone; answers saved while the app runs are kept per user (`cache.get/put(..., owner)`).
 - Voice input uses the browser Web Speech API: Chrome, Edge and Safari only, and it needs an internet connection. The mic button is hidden when it isn't supported.

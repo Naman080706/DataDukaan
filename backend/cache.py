@@ -3,7 +3,8 @@
 Only the plan (SQL, assumptions, title) is saved. The SQL is re-validated and
 re-run on every hit, so numbers always come from the database.
 Seeded from data/saved_answers.json (built by scripts/warm_cache.py), plus an
-in-memory layer filled at runtime (per server instance).
+in-memory layer filled at runtime (per server instance). Runtime entries are kept per user, so one
+user's AI-written wording is never shown to another; only the reviewed seed file is shared.
 """
 import json
 import os
@@ -35,19 +36,25 @@ def _load() -> dict[str, dict]:
     return _store
 
 
-def get(question: str) -> dict | None:
+def _key(question: str, owner: str | None) -> str:
+    q = normalise(question)
+    return f"{owner}|{q}" if owner else q  # normalise() strips "|", so seed keys never contain it
+
+
+def get(question: str, owner: str | None = None) -> dict | None:
     with _lock:
-        return _load().get(normalise(question))
+        store = _load()
+        return (owner and store.get(_key(question, owner))) or store.get(_key(question, None))
 
 
-def put(question: str, plan: dict) -> None:
+def put(question: str, plan: dict, owner: str | None = None) -> None:
     with _lock:
         store = _load()
         if len(store) >= MAX_ITEMS:
             store.pop(next(iter(store)))
-        store[normalise(question)] = {k: plan.get(k) for k in ("sql", "assumptions", "title", "model")}
+        store[_key(question, owner)] = {k: plan.get(k) for k in ("sql", "assumptions", "title", "model")}
 
 
 def save_seed() -> None:
     with _lock, open(SEED_PATH, "w", encoding="utf-8") as f:
-        json.dump(_load(), f, indent=2)
+        json.dump({k: v for k, v in _load().items() if "|" not in k}, f, indent=2)

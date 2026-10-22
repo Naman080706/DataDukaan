@@ -116,7 +116,8 @@ def rules(user: dict = Signed):
 
 @app.post("/api/ask")
 def ask_endpoint(req: AskRequest, user: dict = Signed):
-    result = ask(req.question.strip(), [t.model_dump() for t in req.history], inject_fault=req.inject_fault, mode=req.mode)
+    result = ask(req.question.strip(), [t.model_dump() for t in req.history], inject_fault=req.inject_fault, mode=req.mode,
+                 owner=user["email"])
     qid = uuid.uuid4().hex[:12]
     result["id"] = qid
     result["conversation_id"] = req.conversation_id

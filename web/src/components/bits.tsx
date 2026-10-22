@@ -50,7 +50,17 @@ export function CountUp({ to, duration = 1400, className = "" }: { to: number; d
 }
 
 /** A card with a soft carbon-green glow that follows the pointer. */
-export function SpotlightCard({ children, className = "", as: Tag = "div" }: { children: ReactNode; className?: string; as?: "div" | "figure" | "li" }) {
+export function SpotlightCard({
+  children,
+  className = "",
+  as: Tag = "div",
+  label,
+}: {
+  children: ReactNode;
+  className?: string;
+  as?: "div" | "figure" | "li";
+  label?: string;
+}) {
   const ref = useRef<HTMLElement>(null);
   return (
     <Tag
@@ -60,6 +70,7 @@ export function SpotlightCard({ children, className = "", as: Tag = "div" }: { c
         ref.current!.style.setProperty("--x", `${e.clientX - r.left}px`);
         ref.current!.style.setProperty("--y", `${e.clientY - r.top}px`);
       }}
+      aria-label={label}
       className={`spotlight ${className}`}
     >
       {children}
