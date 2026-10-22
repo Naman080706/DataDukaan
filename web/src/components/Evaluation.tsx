@@ -128,7 +128,7 @@ export default function Evaluation() {
                     <td className="hidden align-top text-[13px] text-muted sm:table-cell">{t.category}</td>
                     <td className="py-2 text-right align-top">
                       {running === t.id ? (
-                        <Loader2 size={16} className="ml-auto animate-spin text-carbon" />
+                        <Loader2 size={16} className="ml-auto animate-spin text-carbon-deep" />
                       ) : r ? (
                         <span className={`stamp stamp-sm ${r.passed ? "text-ledger" : "text-stamp"}`}>{r.passed ? "Pass" : "Fail"}</span>
                       ) : (
@@ -138,7 +138,7 @@ export default function Evaluation() {
                   </tr>
                   {isOpen && (
                     <tr>
-                      <td colSpan={4} className="bg-[#FAFAFD] px-3 pb-5 pt-3">
+                      <td colSpan={4} className="bg-[#FCFBF7] px-3 pb-5 pt-3">
                         <p className="max-w-3xl text-[13.5px] text-muted">The trap: {t.challenge}</p>
                         {r && (
                           <p className={`mt-1 text-[13.5px] ${r.passed ? "text-ledger" : "text-stamp"}`}>

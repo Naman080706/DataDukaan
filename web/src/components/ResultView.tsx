@@ -84,7 +84,7 @@ export function SortableTable({ columns, rows, max = 200, exportable = true }: {
         </table>
       </div>
       {exportable && (
-        <button onClick={() => downloadCSV("datadukaan-result.csv", columns, rows)} className="mt-3 text-[13px] font-medium text-carbon underline-offset-2 hover:underline">
+        <button onClick={() => downloadCSV("datadukaan-result.csv", columns, rows)} className="mt-3 text-[13px] font-medium text-carbon-deep underline-offset-2 hover:underline">
           Download as CSV
         </button>
       )}
@@ -101,7 +101,7 @@ function AutoChart({ r }: { r: AskResponse }) {
   const data = r.rows.map((row) => ({ label: String(useDesc ? row[descIdx] ?? row[0] : row[0]).slice(0, 30), value: row[valueIdx] as number }));
   const fmt = (v: number) => formatCell(valueCol, v);
   const compact = (v: number) => Intl.NumberFormat("en-GB", { notation: "compact" }).format(v);
-  const axis = { fontSize: 12, fill: "#68657F", fontFamily: "Archivo" };
+  const axis = { fontSize: 12, fill: "#6B6F66", fontFamily: "Archivo" };
   return (
     <figure>
       <figcaption className="mb-2 text-[13px] text-muted">
@@ -110,19 +110,19 @@ function AutoChart({ r }: { r: AskResponse }) {
       <ResponsiveContainer width="100%" height={Math.max(240, r.chart_type === "bar" ? data.length * 30 + 40 : 300)}>
         {r.chart_type === "line" ? (
           <LineChart data={data} margin={{ left: 4, right: 16, top: 8 }}>
-            <CartesianGrid stroke="#D6DBEC" vertical={false} />
-            <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={{ stroke: "#1E1B33" }} />
+            <CartesianGrid stroke="#DED0AB" vertical={false} />
+            <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={{ stroke: "#1D2521" }} />
             <YAxis tick={axis} tickFormatter={compact} tickLine={false} axisLine={false} width={56} />
-            <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 2, borderColor: "#D6DBEC", fontFamily: "Archivo" }} />
-            <Line type="monotone" dataKey="value" name={valueCol} stroke="#4338A8" strokeWidth={2.5} dot={{ r: 3, fill: "#4338A8" }} />
+            <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 2, borderColor: "#DED0AB", fontFamily: "Archivo" }} />
+            <Line type="monotone" dataKey="value" name={valueCol} stroke="#009B77" strokeWidth={2.5} dot={{ r: 3, fill: "#009B77" }} />
           </LineChart>
         ) : (
           <BarChart data={data} layout="vertical" margin={{ left: 4, right: 24 }}>
-            <CartesianGrid stroke="#D6DBEC" horizontal={false} />
+            <CartesianGrid stroke="#DED0AB" horizontal={false} />
             <XAxis type="number" tick={axis} tickFormatter={compact} tickLine={false} axisLine={false} />
-            <YAxis type="category" dataKey="label" width={200} tick={axis} interval={0} tickLine={false} axisLine={{ stroke: "#1E1B33" }} />
-            <Tooltip formatter={(v: number) => fmt(v)} cursor={{ fill: "#ECEAF8" }} contentStyle={{ borderRadius: 2, borderColor: "#D6DBEC", fontFamily: "Archivo" }} />
-            <Bar dataKey="value" name={valueCol} fill="#4338A8" barSize={16} />
+            <YAxis type="category" dataKey="label" width={200} tick={axis} interval={0} tickLine={false} axisLine={{ stroke: "#1D2521" }} />
+            <Tooltip formatter={(v: number) => fmt(v)} cursor={{ fill: "#B2E1D6" }} contentStyle={{ borderRadius: 2, borderColor: "#DED0AB", fontFamily: "Archivo" }} />
+            <Bar dataKey="value" name={valueCol} fill="#009B77" barSize={16} />
           </BarChart>
         )}
       </ResponsiveContainer>
@@ -143,7 +143,7 @@ export function SqlInspector({ sql, note = true }: { sql: string; note?: boolean
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="font-medium text-carbon underline-offset-2 hover:underline"
+          className="font-medium text-carbon-deep underline-offset-2 hover:underline"
         >
           {copied ? "Copied" : "Copy SQL"}
         </button>

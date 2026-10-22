@@ -7,7 +7,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid #4338a8;
+  outline: 2px solid #00735a;
   outline-offset: 2px;
 }
 
@@ -23,26 +23,26 @@ body {
 /* A bill-book sheet: the one surface with depth. */
 .sheet {
   @apply bg-sheet;
-  box-shadow: 0 1px 0 #d6dbec, 0 18px 40px -28px rgba(30, 27, 51, 0.45);
+  box-shadow: 0 1px 0 #ded0ab, 0 18px 40px -28px rgba(29, 37, 33, 0.3);
 }
 
 /* Perforation between counterfoil and bill. */
 .perforation {
-  background-image: radial-gradient(circle, #eeedf5 2.5px, transparent 3px);
+  background-image: radial-gradient(circle, #ded0ab 2.5px, transparent 3px);
   background-size: 8px 13px;
   background-position: center top;
   background-repeat: repeat-y;
 }
 .perforation-h {
-  background-image: radial-gradient(circle, #eeedf5 2.5px, transparent 3px);
+  background-image: radial-gradient(circle, #ded0ab 2.5px, transparent 3px);
   background-size: 13px 8px;
   background-repeat: repeat-x;
   background-position: left center;
 }
 
-/* Red margin rule, as in a ledger book. */
+/* Gold margin rule, as in a ledger book. */
 .margin-rule {
-  border-left: 1px solid #e28a85;
+  border-left: 1px solid #c8b273;
   padding-left: 0.875rem;
 }
 
@@ -57,19 +57,19 @@ body {
 /* Ledger tables: double rule under the header, like an account book. */
 .ledger th {
   @apply narrow whitespace-nowrap px-3 pb-1.5 pt-2 text-left text-[13px] font-semibold text-muted;
-  border-bottom: 3px double #1e1b33;
+  border-bottom: 3px double #1d2521;
 }
 .ledger td {
   @apply border-b border-rule px-3 py-1.5;
 }
 .ledger tr:hover td {
-  background: #f6f5fb;
+  background: #f3efe2;
 }
 
-/* Carbon copy: SQL printed in violet carbon ink. */
+/* Carbon copy: SQL printed in teal carbon ink. */
 .carbon-copy {
-  @apply overflow-x-auto whitespace-pre-wrap break-words rounded-sm bg-carbon-wash p-4 font-mono text-[12.5px] leading-relaxed text-carbon-deep;
-  background-image: repeating-linear-gradient(0deg, transparent 0 21px, rgba(67, 56, 168, 0.07) 21px 22px);
+  @apply overflow-x-auto whitespace-pre-wrap break-words rounded-sm bg-carbon-wash/40 p-4 font-mono text-[12.5px] leading-relaxed text-carbon-deep;
+  background-image: repeating-linear-gradient(0deg, transparent 0 21px, rgba(0, 155, 119, 0.09) 21px 22px);
 }
 
 /* Rubber stamp: the single loud element. */
@@ -105,11 +105,11 @@ body {
   @apply -mb-px whitespace-nowrap border-b-2 border-transparent px-1 pb-2 text-sm font-medium text-muted transition-colors hover:text-ink;
 }
 .tab[aria-selected="true"] {
-  @apply border-carbon text-carbon;
+  @apply border-carbon text-carbon-deep;
 }
 
 .btn-carbon {
-  @apply rounded-sm bg-carbon px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-carbon-deep disabled:opacity-40;
+  @apply rounded-sm bg-carbon-deep px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#005C48] disabled:opacity-40;
 }
 
 @media (prefers-reduced-motion: reduce) {

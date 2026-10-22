@@ -19,13 +19,13 @@ from backend.evaluation import compare_engines  # noqa: E402
 
 OUT = os.path.join(ROOT, "docs", "engine_comparison.png")
 SEGMENTS = [
-    ("answered", "Correct answer", "#2F7A55"),
-    ("asked_then_answered", "Asked back, then answered", "#7FB89A"),
-    ("asked_back", "Rightly asked back", "#4338A8"),
-    ("refused", "Rightly refused", "#8A879C"),
+    ("answered", "Correct answer", "#00735A"),
+    ("asked_then_answered", "Asked back, then answered", "#B2E1D6"),
+    ("asked_back", "Rightly asked back", "#C8B273"),
+    ("refused", "Rightly refused", "#A8A28F"),
     ("failed", "Failed", "#B8322A"),
 ]
-INK, MUTED, RULE, PAPER = "#1E1B33", "#68657F", "#D6DBEC", "#FFFFFF"
+INK, MUTED, RULE, PAPER = "#1D2521", "#6B6F66", "#DED0AB", "#FFFFFF"
 
 
 def main() -> None:

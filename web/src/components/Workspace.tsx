@@ -25,11 +25,11 @@ export function stampFor(e: Entry): StampKind | null {
   if (e.error) return { text: "Failed", color: "text-stamp" };
   const r = e.response;
   if (!r) return null;
-  if (r.status === "clarification") return { text: "Needs detail", color: "text-carbon" };
+  if (r.status === "clarification") return { text: "Needs detail", color: "text-gold-deep" };
   if (r.status === "refused" || r.status === "blocked") return { text: "Refused", color: "text-stamp" };
   if (r.status === "unavailable") return { text: "Can't answer", color: "text-stamp" };
   if (r.status !== "success") return { text: "Failed", color: "text-stamp" };
-  if (r.attempts > 1) return { text: "Fixed & re-run", color: "text-carbon" };
+  if (r.attempts > 1) return { text: "Fixed & re-run", color: "text-gold-deep" };
   if (r.source === "offline") return { text: "Answered offline", color: "text-ledger" };
   if (r.source === "saved") return { text: "Saved answer", color: "text-ledger" };
   return { text: "Answered", color: "text-ledger" };
@@ -112,11 +112,11 @@ export default function Workspace() {
     <div className="space-y-4">
       <div className="sheet grid min-h-[520px] md:grid-cols-[230px_10px_1fr]">
         {/* Counterfoils: one stub per question, in the order asked. */}
-        <aside className="border-b border-rule bg-[#FAFAFD] md:border-b-0">
+        <aside className="border-b border-rule bg-[#FCFBF7] md:border-b-0">
           <div className="flex items-baseline justify-between px-4 pb-2 pt-4">
             <span className="text-sm font-semibold">This session</span>
             {entries.length > 0 && (
-              <button onClick={startOver} className="text-[13px] text-muted underline-offset-2 hover:text-carbon hover:underline">
+              <button onClick={startOver} className="text-[13px] text-muted underline-offset-2 hover:text-carbon-deep hover:underline">
                 Start over
               </button>
             )}
@@ -137,7 +137,7 @@ export default function Workspace() {
                         setViewSaved(null);
                       }}
                       className={`block w-full border-l-[3px] px-4 py-3 text-left transition-colors ${
-                        !viewSaved && selected === i ? "border-carbon bg-carbon-wash/70" : "border-transparent hover:bg-carbon-wash/40"
+                        !viewSaved && selected === i ? "border-carbon bg-carbon-wash/50" : "border-transparent hover:bg-carbon-wash/40"
                       }`}
                     >
                       <span className="narrow text-[15px] font-bold text-muted">No. {String(i + 1).padStart(3, "0")}</span>
@@ -159,7 +159,7 @@ export default function Workspace() {
                     <button
                       onClick={() => setViewSaved(s.id)}
                       className={`block w-full border-l-[3px] px-4 py-2.5 text-left transition-colors ${
-                        viewSaved === s.id ? "border-ledger bg-carbon-wash/70" : "border-transparent hover:bg-carbon-wash/40"
+                        viewSaved === s.id ? "border-ledger bg-carbon-wash/50" : "border-transparent hover:bg-carbon-wash/40"
                       }`}
                     >
                       <span className="line-clamp-2 block text-[13.5px] leading-snug">{s.question}</span>
@@ -224,11 +224,11 @@ export default function Workspace() {
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-1 px-4 pb-3 pt-2 text-[13px] text-muted">
           <label className="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" checked={injectFault} onChange={(e) => setInjectFault(e.target.checked)} className="accent-carbon" />
+            <input type="checkbox" checked={injectFault} onChange={(e) => setInjectFault(e.target.checked)} className="accent-carbon-deep" />
             Demo: break the first SQL, to watch the agent fix it
           </label>
           <label className="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" checked={simulateOutage} onChange={(e) => setSimulateOutage(e.target.checked)} className="accent-carbon" />
+            <input type="checkbox" checked={simulateOutage} onChange={(e) => setSimulateOutage(e.target.checked)} className="accent-carbon-deep" />
             Demo: pretend the AI is down, to use the offline engine
           </label>
         </div>
@@ -289,7 +289,7 @@ function Bill({
 
       {!r && !entry.error && (
         <div className="mt-6 flex items-center gap-3 text-[15px] text-muted">
-          <Loader2 className="animate-spin text-carbon" size={18} /> Reading the question, writing SQL and running it on the ledger…
+          <Loader2 className="animate-spin text-carbon-deep" size={18} /> Reading the question, writing SQL and running it on the ledger…
         </div>
       )}
 
@@ -314,7 +314,7 @@ function Bill({
 
           {r.status === "success" && (
             <>
-              <button onClick={onToggleSave} className="mt-4 text-[13px] font-medium text-carbon underline-offset-2 hover:underline">
+              <button onClick={onToggleSave} className="mt-4 text-[13px] font-medium text-carbon-deep underline-offset-2 hover:underline">
                 {saved ? "Remove from saved analyses" : "Save this analysis"}
               </button>
               <ResultView r={r} />
