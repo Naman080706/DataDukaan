@@ -14,8 +14,17 @@ from .validator import ValidationError, validate_sql
 
 MAX_RETRIES = 2
 
+EXPLORE_ACTION = """
+{"action": "explore", "sql": "<single SELECT with LIMIT <= 50>", "why": "<what you need to check, in plain English>"}
+Use "explore" BEFORE answering when you need to look at the actual data first: how a value is spelled or stored
+(e.g. which values a column really contains, matching a name the user typed), whether a column holds what you think,
+or a range you need. You will get the result and can then answer. At most 2 explores per question; don't explore
+when the data profile already tells you what you need."""
+
+
 def planner_system(schema: str, rules: str, ambiguity: str, table: str = "transactions", year: int = 2011,
-                   money_alias: str = "net_revenue_gbp", analyst: str = "a careful retail data analyst") -> str:
+                   money_alias: str = "net_revenue_gbp", analyst: str = "a careful retail data analyst",
+                   explore: bool = False) -> str:
     return f"""You are DataDukaan, {analyst} that writes DuckDB SQL.
 
 {schema}
@@ -33,7 +42,7 @@ Before writing SQL, break the question into "steps" (1 step for a simple questio
 ["Find the month in {year} with the highest net revenue", "Rank products by net revenue within that month", "Keep the top 5"]),
 then write ONE SQL statement that does all the steps (use WITH for the inner steps, rule 14).
 {{"action": "clarify", "question": "<one clarifying question>", "options": ["<option 1>", "<option 2>", ...]}}
-{{"action": "refuse", "reason": "<why>"}}
+{{"action": "refuse", "reason": "<why>"}}{EXPLORE_ACTION if explore else ""}
 Use readable column aliases (e.g. {money_alias}, returned_units). Never invent tables or columns.
 The "assumptions", "title", clarifying "question", "options" and refusal "reason" are shown to a shop manager with no
 technical background: write them in plain everyday English. Never mention SQL, tables, column names, flags or code values

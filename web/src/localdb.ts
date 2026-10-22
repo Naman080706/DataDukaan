@@ -15,6 +15,44 @@ export interface DatasetProfile {
   date_range: [string | null, string | null];
   countries: string[];
   mapping: { field: string; column: string }[]; // retail only: which of the user's columns fills each field
+  column_stats: ColumnStats[]; // measured on the whole table, so the AI knows what the data really holds
+}
+
+export interface ColumnStats {
+  name: string;
+  type: string;
+  null_pct: number;
+  distinct: number | null;
+  min: Cell;
+  max: Cell;
+  avg: number | null;
+  top: [Cell, number][]; // most common values, for columns with few distinct values
+}
+
+// The table's profile: one SUMMARIZE pass, plus the most common values of category-like text columns.
+async function profileTable(table: string): Promise<ColumnStats[]> {
+  const s = await runQuery(`SELECT * FROM (SUMMARIZE ${table})`, 200);
+  const idx = (name: string) => s.columns.indexOf(name);
+  const num = (v: Cell) => (v === null || v === "" ? null : Number(v));
+  const stats: ColumnStats[] = s.rows.map((r) => ({
+    name: String(r[idx("column_name")]),
+    type: String(r[idx("column_type")]),
+    null_pct: Math.round((num(r[idx("null_percentage")]) ?? 0) * 10) / 10,
+    distinct: num(r[idx("approx_unique")]),
+    min: typeof r[idx("min")] === "string" ? String(r[idx("min")]).slice(0, 40) : r[idx("min")],
+    max: typeof r[idx("max")] === "string" ? String(r[idx("max")]).slice(0, 40) : r[idx("max")],
+    avg: r[idx("avg")] === null ? null : Math.round(Number(r[idx("avg")]) * 100) / 100,
+    top: [],
+  }));
+  let looked = 0;
+  for (const c of stats) {
+    if (looked >= 25 || !/^VARCHAR/.test(c.type) || c.distinct === null || c.distinct > 60) continue;
+    looked++;
+    const id = `"${c.name.replace(/"/g, '""')}"`;
+    const t = await runQuery(`SELECT ${id} AS v, count(*) AS n FROM ${table} WHERE ${id} IS NOT NULL GROUP BY 1 ORDER BY n DESC LIMIT 15`, 15);
+    c.top = t.rows.map((r) => [typeof r[0] === "string" ? r[0].slice(0, 40) : r[0], Number(r[1])]);
+  }
+  return stats;
 }
 
 let dbPromise: Promise<AsyncDuckDB> | null = null;
@@ -252,8 +290,9 @@ export async function loadDataset(file: File, nonProductCodes: string[]): Promis
     kind === "retail"
       ? (await runQuery("SELECT DISTINCT country FROM transactions WHERE country IS NOT NULL LIMIT 400", 400)).rows.map((r) => String(r[0]))
       : [];
+  const column_stats = await profileTable(table).catch(() => []);
   return {
-    source: file.name, kind, table, row_count: count, columns, sample_rows: sample, date_range, countries,
+    source: file.name, kind, table, row_count: count, columns, sample_rows: sample, date_range, countries, column_stats,
     mapping: mapping && kind === "retail" ? Object.entries(mapping).map(([field, column]) => ({ field: FIELD_WORDS[field] ?? field, column })) : [],
   };
 }

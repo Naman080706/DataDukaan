@@ -168,6 +168,7 @@ export function SqlInspector({ sql, note = true }: { sql: string; note?: boolean
 const STEP_LABEL: Record<string, string> = {
   get_schema: "Read the counting rules",
   plan_steps: "Broke the question into smaller steps",
+  explore: "Looked at your data first",
   generate_sql: "Worked out how to calculate it",
   inject_fault: "Demo: broke the calculation on purpose",
   validate_sql: "Checked it only reads the records, never changes them",
@@ -195,6 +196,7 @@ function Steps({ r }: { r: AskResponse }) {
                 <span className={`h-2 w-2 rounded-full ${STEP_COLOR[s.status] ?? "bg-muted"}`} aria-hidden />
                 {STEP_LABEL[s.tool] ?? s.tool}
               </div>
+              {!details && s.tool === "explore" && s.detail && <div className="mt-0.5 text-[13px] text-muted">{s.detail.split("\n")[0]}</div>}
               {details && s.detail && (
                 <div className="mt-0.5 whitespace-pre-wrap break-words font-mono text-[12px] leading-relaxed text-muted">{s.detail}</div>
               )}

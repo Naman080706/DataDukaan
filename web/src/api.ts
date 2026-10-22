@@ -111,7 +111,8 @@ export const api = {
   runTests: (ids: string[], mode: EvalMode) => req<EvalRun>("/api/evaluation/run", { ids, mode }),
   // A user's own dataset: the server plans/fixes/summarises, the browser runs the SQL.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  datasetPlan: (question: string, history: Turn[], dataset: unknown, mode: "auto" | "offline") => req<any>("/api/dataset/plan", { question, history, dataset, mode }),
+  datasetPlan: (question: string, history: Turn[], dataset: unknown, mode: "auto" | "offline", observations: unknown[] = []) =>
+    req<any>("/api/dataset/plan", { question, history, dataset, mode, observations }),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   datasetFix: (question: string, sql: string, error: string, dataset: unknown) => req<any>("/api/dataset/fix", { question, sql, error, dataset }),
   datasetSummarise: (question: string, title: string, assumptions: string[], columns: string[], rows: Cell[][], source: "ai" | "offline") =>

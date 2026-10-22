@@ -9,7 +9,7 @@ import json
 from .agent import _history_text, choose_chart, fix_system, planner_system, summary_system
 from .llm import LLMError, generate_json
 from .offline import Ctx, describe_result, plan_offline
-from .rules import generic_rules, periods, retail_rules
+from .rules import generic_rules, periods, profile_text, retail_rules
 from .validator import ValidationError, validate_sql
 
 MAX_SAMPLE_ROWS = 5
@@ -24,24 +24,40 @@ def _context(ds: dict) -> dict:
         r = retail_rules(str(dr[0]), str(dr[1]), money="the dataset's own currency (not stated; use no currency symbol)",
                          money_suffix="value", source=f'the user\'s uploaded file "{source}"')
         year = r["periods"]["this_year"]
+        schema = r["schema"]
+        if ds.get("column_stats"):
+            schema += "\n\nDATA PROFILE of this table (measured on the whole file):\n" + profile_text(ds["column_stats"])
         return {
             "table": "transactions", "retail": True, "periods": r["periods"],
-            "planner": planner_system(r["schema"], r["rules"], r["ambiguity"], year=year, money_alias="net_revenue_value"),
+            "planner": planner_system(schema, r["rules"], r["ambiguity"], year=year, money_alias="net_revenue_value",
+                                      explore=True),
             "fix": fix_system(r["schema"], r["rules"]),
         }
     table = "dataset"
     r = generic_rules(table, ds.get("columns", [])[:80], ds.get("sample_rows", [])[:MAX_SAMPLE_ROWS],
-                      int(ds.get("row_count") or 0), dr if dr[1] else None, source)
+                      int(ds.get("row_count") or 0), dr if dr[1] else None, source, ds.get("column_stats"))
     year = periods(str(dr[1]))["this_year"] if dr[1] else 2024
     return {
         "table": table, "retail": False, "periods": None,
         "planner": planner_system(r["schema"], r["rules"], r["ambiguity"], table=table, year=year,
-                                  money_alias="total_value", analyst="a careful data analyst"),
+                                  money_alias="total_value", analyst="a careful data analyst", explore=True),
         "fix": fix_system(r["schema"], r["rules"]),
     }
 
 
-def plan(question: str, history: list[dict], ds: dict, mode: str = "auto") -> dict:
+MAX_EXPLORES = 2
+
+
+def _observations_text(observations: list[dict]) -> str:
+    out = []
+    for i, o in enumerate(observations[:MAX_EXPLORES], 1):
+        rows = "\n".join("    " + " | ".join(str(v)[:40] for v in r) for r in (o.get("rows") or [])[:30])
+        out.append(f"Look-up {i} ({o.get('why', '')}):\n  SQL: {o.get('sql', '')}\n  Columns: {o.get('columns')}\n"
+                   + (f"  Rows:\n{rows}" if rows else f"  Result: {o.get('error') or 'no rows'}"))
+    return "\n".join(out)
+
+
+def plan(question: str, history: list[dict], ds: dict, mode: str = "auto", observations: list[dict] | None = None) -> dict:
     """Decide: clarify, refuse, or validated SQL to run in the browser. Returns the plan plus its trace steps."""
     ctx = _context(ds)
     trace: list[dict] = []
@@ -52,6 +68,11 @@ def plan(question: str, history: list[dict], ds: dict, mode: str = "auto") -> di
     if mode != "offline":
         step("get_schema", "ok", f"your table's columns and {'the retail counting rules' if ctx['retail'] else 'a few sample rows'}")
         user_msg = f"Conversation so far:\n{_history_text(history)}\n\nNew question: {question}"
+        observations = observations or []
+        if observations:
+            user_msg += "\n\nYou already looked at the data:\n" + _observations_text(observations)
+            user_msg += ("\nNow answer with action \"sql\" (or \"clarify\")." if len(observations) >= MAX_EXPLORES
+                         else "\nAnswer now, or explore once more only if you really need to.")
         try:
             result = generate_json(ctx["planner"], user_msg)
             if result.get("action") == "clarify" and offline_ctx:
@@ -73,6 +94,19 @@ def plan(question: str, history: list[dict], ds: dict, mode: str = "auto") -> di
 
     action = result.get("action")
     model = result.get("_model") if source == "ai" else "offline rule engine"
+    if action == "explore":
+        if len(observations or []) >= MAX_EXPLORES:
+            action = "sql" if result.get("sql") else "clarify"
+        else:
+            try:
+                look = validate_sql(result.get("sql", ""), {ctx["table"]})
+            except ValidationError as e:
+                step("explore", "blocked", str(e))
+                return {"status": "error", "trace": trace, "source": source, "model": model,
+                        "answer": "DataDukaan couldn't work this out. Try asking it a different way."}
+            step("explore", "ok", f"{result.get('why', '')}\n{look}")
+            return {"status": "explore", "sql": look, "why": result.get("why", ""), "trace": trace,
+                    "source": source, "model": model}
     if action == "clarify":
         step("clarify", "ok", result.get("question", ""))
         return {"status": "clarification", "answer": result.get("question", ""), "options": result.get("options", []),

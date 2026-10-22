@@ -177,8 +177,29 @@ Do NOT ask when the data rules above already define the term. These are defined,
     return {"schema": schema, "rules": rules, "ambiguity": ambiguity, "periods": p}
 
 
+def profile_text(stats: list[dict], limit: int = 7000) -> str:
+    """Per-column facts about the user's data, measured in their browser: blanks, distinct values, ranges, common values."""
+    lines = []
+    for c in stats[:80]:
+        bits = [f"{c.get('type', '')}"]
+        if c.get("null_pct"):
+            bits.append(f"{c['null_pct']}% blank")
+        if c.get("distinct") is not None:
+            bits.append(f"~{c['distinct']:,} distinct")
+        if c.get("min") is not None and c.get("max") is not None:
+            bits.append(f"range {str(c['min'])[:25]} to {str(c['max'])[:25]}")
+        if c.get("avg") is not None:
+            bits.append(f"average {c['avg']}")
+        top = c.get("top") or []
+        if top:
+            bits.append("values: " + ", ".join(f"{str(v)[:30]!r} ({n:,})" for v, n in top[:12]))
+        lines.append(f"  {c.get('name', '')}: " + "; ".join(bits))
+    text = "\n".join(lines)
+    return text[:limit] + ("\n  ..." if len(text) > limit else "")
+
+
 def generic_rules(table: str, columns: list[dict], sample_rows: list[list], row_count: int,
-                  date_range: list | None, source: str) -> dict:
+                  date_range: list | None, source: str, stats: list[dict] | None = None) -> dict:
     """Prompt text for a user's own table that doesn't look like retail sales."""
     cols = "\n".join(f"  {c['name']:<24} {c['type']}" for c in columns)
     sample = "\n".join("  " + " | ".join(str(v)[:40] for v in r) for r in sample_rows[:5])
@@ -186,6 +207,8 @@ def generic_rules(table: str, columns: list[dict], sample_rows: list[list], row_
 {cols}
 Sample rows (columns in the order above):
 {sample}""".strip()
+    if stats:
+        schema += "\n\nDATA PROFILE (measured on the whole table; use it to match values exactly as stored):\n" + profile_text(stats)
     period = ""
     if date_range and date_range[1]:
         p = periods(str(date_range[1]))
@@ -195,8 +218,9 @@ Sample rows (columns in the order above):
     rules = f"""
 DATA RULES for this user-uploaded table:
 1. Use only the columns listed. Quote column names with double quotes if they are not plain lowercase identifiers.
-2. Work out what each column means from its name, type and the sample rows; say in "assumptions" how you interpreted
-   the columns you used (in plain English).
+2. Work out what each column means from its name, type, the data profile and the sample rows; say in "assumptions"
+   how you interpreted the columns you used (in plain English). Filter on values exactly as they appear in the profile
+   (case and spelling); if a value the user mentions isn't listed, explore first or match it case-insensitively.
 3. Money: the currency is not known; don't add a currency symbol. Round money-like values to 2 decimals.
 4. Always add a LIMIT (<= 200) for row-level or ranking results.{period}
 6. MULTI-STEP QUESTIONS: if one part depends on another ("top items in the best month"), use WITH (CTE) steps in ONE

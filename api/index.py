@@ -82,6 +82,17 @@ class DatasetInfo(BaseModel):
     row_count: int = 0
     date_range: list[str | None] = [None, None]
     countries: list[str] = Field(default=[], max_length=400)
+    # Per-column profile measured in the browser: blanks, distinct count, range, average, common values.
+    column_stats: list[dict] = Field(default=[], max_length=120)
+
+
+class Observation(BaseModel):
+    """A look-up the AI asked for and the browser ran on the user's data."""
+    sql: str = Field(max_length=4000)
+    why: str = Field(default="", max_length=400)
+    columns: list[str] = Field(default=[], max_length=60)
+    rows: list[list] = Field(default=[], max_length=50)
+    error: str | None = Field(default=None, max_length=600)
 
 
 class DatasetPlanRequest(BaseModel):
@@ -89,6 +100,7 @@ class DatasetPlanRequest(BaseModel):
     history: list[Turn] = []
     dataset: DatasetInfo
     mode: Literal["auto", "offline"] = "auto"
+    observations: list[Observation] = Field(default=[], max_length=2)
 
 
 class DatasetFixRequest(BaseModel):
@@ -164,7 +176,8 @@ def ask_endpoint(req: AskRequest, user: dict = Signed):
 
 @app.post("/api/dataset/plan")
 def dataset_plan(req: DatasetPlanRequest, user: dict = Signed):
-    return client_agent.plan(req.question.strip(), [t.model_dump() for t in req.history], req.dataset.model_dump(), req.mode)
+    return client_agent.plan(req.question.strip(), [t.model_dump() for t in req.history], req.dataset.model_dump(), req.mode,
+                             [o.model_dump() for o in req.observations])
 
 
 @app.post("/api/dataset/fix")

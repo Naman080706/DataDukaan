@@ -4,11 +4,13 @@ import type { DatasetProfile } from "./localdb";
 import { runQuery } from "./localdb";
 
 const MAX_RETRIES = 2;
+const MAX_EXPLORES = 2;
 
 function datasetInfo(p: DatasetProfile) {
   return {
     kind: p.kind, source: p.source, columns: p.columns.slice(0, 200), sample_rows: p.sample_rows.slice(0, 5),
     row_count: p.row_count, date_range: p.date_range, countries: p.countries.slice(0, 400),
+    column_stats: (p.column_stats ?? []).slice(0, 120),
   };
 }
 
@@ -23,8 +25,25 @@ export async function askLocal(
   };
   const done = (r: Partial<AskResponse>) => ({ ...base, ...r, latency_ms: Math.round(performance.now() - t0) });
 
-  const plan = await api.datasetPlan(question, history, ds, mode);
-  const trace: TraceStep[] = plan.trace ?? [];
+  // The AI may look at the data first (up to 2 small look-ups run here), then plan the answer with what it saw.
+  const trace: TraceStep[] = [];
+  const observations: { sql: string; why: string; columns: string[]; rows: Cell[][]; error: string | null }[] = [];
+  let plan = await api.datasetPlan(question, history, ds, mode);
+  trace.push(...(plan.trace ?? []));
+  while (plan.status === "explore" && observations.length < MAX_EXPLORES) {
+    try {
+      const look = await runQuery(plan.sql, 50);
+      const rows = look.rows.slice(0, 30).map((r) => r.map((v) => (typeof v === "string" ? v.slice(0, 60) : v)));
+      observations.push({ sql: plan.sql, why: plan.why ?? "", columns: look.columns, rows, error: null });
+      trace.push({ tool: "execute_readonly_sql", status: "ok", detail: `look-up: ${look.rows.length} rows in ${look.elapsed_ms} ms, in your browser` });
+    } catch (e) {
+      const err = (e instanceof Error ? e.message : String(e)).split("\n")[0].slice(0, 300);
+      observations.push({ sql: plan.sql, why: plan.why ?? "", columns: [], rows: [], error: err });
+      trace.push({ tool: "execute_readonly_sql", status: "error", detail: `look-up failed: ${err}` });
+    }
+    plan = await api.datasetPlan(question, history, ds, mode, observations);
+    trace.push(...(plan.trace ?? []).filter((t: TraceStep) => t.tool !== "get_schema"));
+  }
   const common = { trace, source: plan.source ?? "ai", model: plan.model ?? null };
   if (plan.status !== "run") {
     return done({ ...common, status: plan.status, answer: plan.answer ?? "", options: plan.options ?? [], clarification_required: plan.status === "clarification" });
