@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { api, EvalMode, EvalRun, TestCase, TestResult } from "../api";
 import { SortableTable, SqlInspector } from "./ResultView";
+import { ClaimSuite, FailureTaxonomy, LearningSuite, TestDiagnosis } from "./EvalExtras";
 
 export default function Evaluation() {
   const [suite, setSuite] = useState<TestCase[]>([]);
@@ -10,6 +11,7 @@ export default function Evaluation() {
   const [running, setRunning] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [mode, setMode] = useState<EvalMode>("llm");
+  const [checkAnswers, setCheckAnswers] = useState(false);
 
   useEffect(() => {
     api.suite().then(setSuite);
@@ -29,7 +31,7 @@ export default function Evaluation() {
     for (const t of suite) {
       setRunning(t.id);
       try {
-        const run = await api.runTests([t.id], mode);
+        const run = await api.runTests([t.id], mode, checkAnswers);
         setLive((prev) => ({ ...prev, [t.id]: run.results[0] }));
       } catch (e) {
         setLive((prev) => ({
@@ -86,6 +88,10 @@ export default function Evaluation() {
             </button>
           ))}
         </div>
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-[13px] text-muted">
+          <input type="checkbox" checked={checkAnswers} disabled={!!running} onChange={(e) => setCheckAnswers(e.target.checked)} className="accent-carbon-deep" />
+          Also write each answer and check every statement in it against the result (slower: one more AI call per test)
+        </label>
         {mode === "offline" && (
           <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-muted">
             Backup mode answers when the AI service is unavailable. It was built with these questions in mind, so a high score here shows it covers them, not that it understands any wording.
@@ -104,6 +110,7 @@ export default function Evaluation() {
               ? `Showing the run saved on ${new Date(saved.run_at).toLocaleString("en-GB")}. Running them again asks DataDukaan live, and results can vary slightly between runs.`
               : "No saved run yet. Run the tests to see results."}
         </p>
+        <FailureTaxonomy results={results} />
 
         <table className="ledger mt-6 w-full text-[14px]">
           <thead>
@@ -152,6 +159,7 @@ export default function Evaluation() {
                             {r.latency_ms ? `, ${(r.latency_ms / 1000).toFixed(1)} s` : ""}
                           </p>
                         )}
+                        {r && <TestDiagnosis r={r} />}
                         {r?.agent_answer && r.agent_status !== "success" && (
                           <p className="mt-2 max-w-3xl text-[14px] italic">“{r.agent_answer}”</p>
                         )}
@@ -188,6 +196,8 @@ export default function Evaluation() {
           </tbody>
         </table>
       </div>
+      <ClaimSuite />
+      <LearningSuite mode={mode} />
     </div>
   );
 }

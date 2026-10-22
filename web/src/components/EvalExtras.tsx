@@ -146,6 +146,141 @@ export function ClaimSuite() {
   );
 }
 
+const ROLE_LABEL = { repeat: "Same question", paraphrase: "Similar question", control: "Must not change" };
+
+/** Correction memory: does one correction fix repeated and similar questions, without changing unrelated ones? */
+export function LearningSuite({ mode }: { mode: EvalMode }) {
+  const [saved, setSaved] = useState<LearningRun | null>(null);
+  const [live, setLive] = useState<LearningRun | null>(null);
+  const [running, setRunning] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLive(null);
+    api.savedLearning(mode).then(setSaved).catch(() => setSaved(null));
+  }, [mode]);
+
+  // One scenario per request keeps each call well inside serverless time limits.
+  async function runAll() {
+    const suite = await api.learningSuite();
+    let acc: LearningRun | null = null;
+    for (const sc of suite) {
+      setRunning(sc.id);
+      try {
+        const one = await api.runLearning([sc.id], mode);
+        acc = acc
+          ? { ...one, ...sumRuns(acc, one), scenarios: [...acc.scenarios, ...one.scenarios] }
+          : one;
+        setLive(acc);
+      } catch {
+        // keep the scenarios that finished
+      }
+    }
+    setRunning(null);
+  }
+
+  const run = live ?? saved;
+  return (
+    <div className="sheet px-5 py-7 sm:px-8">
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <div className="max-w-2xl">
+          <h2 className="wide text-[clamp(22px,3vw,30px)] font-extrabold leading-tight tracking-tight">Learning from corrections</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            Four shop-specific habits that the standard rules get “wrong”. For each, we give one correction through “That's not quite right”, then ask
+            the same question, similar questions, and a question the correction must not change, with and without the correction remembered.
+          </p>
+        </div>
+        <button onClick={runAll} disabled={!!running} className="btn-carbon flex items-center gap-2">
+          {running && <Loader2 size={15} className="animate-spin" />}
+          {running ? `Running ${running}` : "Run the learning tests now"}
+        </button>
+      </div>
+      {run ? (
+        <>
+          <dl className="mt-6 flex flex-wrap gap-x-12 gap-y-4 border-y-[3px] border-double border-ink py-4">
+            <Figure value={`${run.learn_before}/${run.learn_total}`} label="similar questions right before the correction" />
+            <Figure value={`${run.learn_after}/${run.learn_total}`} label="right after it was remembered" />
+            <Figure value={`${run.control_after}/${run.control_total}`} label="unrelated questions left unchanged" />
+          </dl>
+          <p className="mt-3 text-[13px] text-muted">
+            {live ? "Live run." : `Showing the run saved on ${new Date(run.run_at).toLocaleString("en-GB")}.`}
+            {mode === "offline" ? " Backup mode applies corrections exactly, so this run is the same every time." : ""}
+          </p>
+          <table className="ledger mt-4 w-full text-[14px]">
+            <tbody>
+              {run.scenarios.map((sc) => (
+                <Fragment key={sc.id}>
+                  <tr className="cursor-pointer" onClick={() => setOpen(open === sc.id ? null : sc.id)}>
+                    <td className="narrow w-14 align-top text-[15px] font-bold text-muted">{sc.id}</td>
+                    <td className="align-top">
+                      <span className="flex items-start gap-1">
+                        <ChevronRight size={15} className={`mt-0.5 shrink-0 text-muted transition-transform ${open === sc.id ? "rotate-90" : ""}`} />
+                        <span>
+                          {sc.pattern}
+                          <span className="block text-[13px] text-muted">
+                            Taught on “{sc.teach.question}”: {sc.learned?.rule ?? "the correction could not be worked out"}
+                          </span>
+                        </span>
+                      </span>
+                    </td>
+                    <td className="narrow w-24 text-right align-top text-[15px]">
+                      {sc.probes.filter((p) => p.role !== "control" && p.after.passed).length}/{sc.probes.filter((p) => p.role !== "control").length}
+                    </td>
+                  </tr>
+                  {open === sc.id && (
+                    <tr>
+                      <td colSpan={3} className="bg-[#FCFBF7] px-3 pb-4 pt-3">
+                        <table className="w-full text-[13.5px]">
+                          <tbody>
+                            {sc.probes.map((p) => (
+                              <tr key={p.question}>
+                                <td className="py-1 pr-3 text-muted">{ROLE_LABEL[p.role]}</td>
+                                <td className="py-1 pr-3">{p.question}</td>
+                                <td className="whitespace-nowrap py-1 text-right">
+                                  <Mark ok={p.before.passed} /> → <Mark ok={p.after.passed} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {sc.learned?.corrected_sql && (
+                          <div className="mt-3 grid gap-4 lg:grid-cols-2">
+                            <div className="min-w-0">
+                              <p className="mb-1 text-sm font-semibold">Before the correction</p>
+                              <SqlInspector sql={sc.learned.original_sql ?? ""} note={false} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="mb-1 text-sm font-semibold">After</p>
+                              <SqlInspector sql={sc.learned.corrected_sql} note={false} />
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        <p className="mt-4 text-[13px] text-muted">No saved run for this mode yet. Run the learning tests to see results.</p>
+      )}
+    </div>
+  );
+}
+
+function sumRuns(a: LearningRun, b: LearningRun) {
+  return {
+    learn_total: a.learn_total + b.learn_total, learn_before: a.learn_before + b.learn_before, learn_after: a.learn_after + b.learn_after,
+    control_total: a.control_total + b.control_total, control_before: a.control_before + b.control_before, control_after: a.control_after + b.control_after,
+  };
+}
+
+function Mark({ ok }: { ok: boolean }) {
+  return <span className={`font-semibold ${ok ? "text-ledger" : "text-stamp"}`}>{ok ? "right" : "wrong"}</span>;
+}
+
 const emptyCheck = { status: "grounded" as const, counts: { supported: 0, contradicted: 0, unsupported: 0, hypothesis: 0 }, grounded_share: null, categories: [] };
 
 function Figure({ value, label }: { value: string; label: string }) {
