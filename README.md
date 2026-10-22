@@ -19,7 +19,10 @@ DataDukaan answers plain-English questions about two years of real transactions 
 4. **Executes** on a **read-only DuckDB connection**, with external access disabled, locked config, a 15-second timeout and a 500-row cap.
 5. **Inspects errors and retries** (at most 2 retries). The LLM gets the database error back and repairs the query.
 6. **Answers only from the returned rows.** The answer shows the SQL, a sortable table, an automatically chosen bar or line chart, CSV export and the full tool-call trace.
-7. **Keeps history.** The session's questions and answers survive a page reload, and any answer can be kept under "Saved analyses". Both are stored in the browser (localStorage), so they belong to that browser only.
+7. **Checks every claim in the answer** against the rows and the SQL ([evidence check](#evidence-check-anti-fluent-guess)). An AI draft that states something the result doesn't show is rewritten from the figures; explanations are marked as hypotheses.
+8. **Learns from corrections.** "That's not quite right" under any answer records what was wrong; similar questions later use the correction ([correction memory](#learning-from-corrections)).
+9. **Looks ahead.** Questions about the future get a forecast with a range, and "what should we do?" gets a ranked action list ([forecasts and actions](#forecasts-and-recommended-actions)).
+10. **Keeps history.** The session's questions and answers survive a page reload, and any answer can be kept under "Saved analyses". Both are stored in the browser (localStorage), so they belong to that browser only.
 
 ### Multi-step questions
 
@@ -28,6 +31,61 @@ Some questions need one answer to find another: "What were the top 5 products by
 - **AI:** the instructions tell the model to break the question into steps first (shown in the app as "Broke the question into smaller steps") and then answer it in one query, using a `WITH` step for the inner answer. Worked examples are included. The result also shows which month or country the first step picked.
 - **Backup mode:** recognises "in the best / worst month, quarter or country (of a year, outside the UK)", "in the country with the highest net revenue…" and "which month had the most returns, and … that month". It works out the inner answer first, says it ("Step 1: the month of 2011 with the highest net revenue was November 2011"), then answers the main question within it.
 - **Definitions:** "this year" = 2011 and "last year" = 2010 (the latest years in the data); "best" month, country or product = highest net revenue unless another measure is named.
+
+### Forecasts and recommended actions
+
+The rest of DataDukaan answers "what happened?". A store manager's next questions are "what should I expect next month?" and "what should I do about it?".
+
+**Forecasting tool** (`backend/forecast.py`, no extra dependencies). It forecasts net revenue, units sold, orders, units returned or value of returns, for the whole shop, one country or one product, 1 to 6 months ahead.
+- The data ends on 9 December 2011, so forecasts are built from the months up to November 2011 and start with December 2011.
+- Four small models are tried: the same month last year scaled by recent growth, Holt's trend smoothing, a 3-month average, and a blend of the first two. Each is back-tested from rolling origins over the last 12 months, judged on every step of the horizon (not just the next month), and the most accurate one is used.
+- Prediction intervals (80% and 95%) come from the chosen model's own back-test errors at each step ahead, so a model that tested badly gets honestly wide ranges. With too little history to measure errors, it assumes ±100% rather than showing a falsely narrow range.
+- One-off spikes in returns (a single bulk cancellation can be 8× a normal month) are capped at median + 5×MAD when fitting, and the answer lists which months were capped.
+- Shop-wide net revenue back-tests at about 10% error; returns are far noisier (about 90%), and the app says so.
+
+**Prescriptive agent** (`backend/actions.py`). Two deterministic steps, so every number in an action traces back to a query:
+1. **Diagnose**: the top 40 products by net revenue plus the 15 most-returned products, and the top 12 countries, are marked Critical / Watch / Healthy against shop benchmarks for the last 12 complete months (3.6% of product units sold came back; 6.9% of sales value) and against their own forecasts.
+2. **Recommend**: each finding becomes a concrete action with its evidence, ranked by severity × money at stake.
+
+| Rule | Applies to | Finding → action |
+|---|---|---|
+| R1 | product | Return rate ≥ 3× the shop's (Critical) or 1.5× (Watch) → record a return reason, check listing and packing |
+| R2 | product | Returns forecast for the next quarter above an allowance (1.5 × shop rate × forecast units sold); Critical when even the low end of the 80% range is above it |
+| R3 | product | Two customers behind ≥ 40% of a flagged product's returns → contact them, add a check for unusually large orders |
+| R4 | country | Net revenue forecast for the next 3 months below the same months last year; Critical when even the top of the 80% range is ≥ 15% below |
+| R5 | country | Share of sales value returned ≥ 2× the shop's |
+| R6 | product | Healthy best-seller whose forecast is above its usual month even at the low end of the range → plan stock for the top of the range |
+
+Example: the top action is the Medium Ceramic Top Storage Jar (23166), with 95.7% of units sold returned (26.7× the shop's rate), followed by contacting the 2 customers behind 100% of those returns (the famous 74,215-unit order cancelled in January 2011). Next comes falling sales in EIRE, forecast 26% below last winter.
+
+In the Ask box, questions like "What should I expect for revenue next month?", "Forecast returns for Germany next quarter" or "What should we do about returns?" go to these tools (no AI needed). Unknown names ("forecast revenue for Narnia") are asked back instead of quietly becoming "the whole shop". The **Plan ahead** page has pickers for the forecast, the full action list, everything that was checked and the rules.
+
+### Evidence check (anti-fluent-guess)
+
+"Summarise only the actual result" doesn't stop a fluent answer from overstating what the result proves. So after the answer is written, `backend/claims.py` splits it into atomic claims and checks each one against the executed result and the facts of the SQL (`backend/sql_facts.py` reads the measure, period, grouping and exclusions from the parsed query):
+
+| Claim | Backed when |
+|---|---|
+| Number | it is a cell, or derived from cells (a total, an average, a share, a change between two rows, a ratio, the row count), within the precision it was written to ("£1.46 million" ±£5,000; "about" allows 10%) |
+| Ranking ("X was the highest") | X is first on the measure in the result |
+| Trend ("rose from A to B") | the two periods moved that way |
+| Metric, period, exclusion wording | it matches what the SQL computed (saying "gross" for a net calculation, "in 2010" for a 2011 filter, or "outside the UK" without that filter is a contradiction) |
+| Explanation ("because", "driven by", "likely", "Christmas") | never: an aggregate can't prove a cause, so it is labelled a hypothesis |
+
+Names from the result are masked first, so a product called "PAPER CHAIN KIT 50'S CHRISTMAS" is neither a number nor an explanation. The checker is rule-based on purpose: it must not be able to make the same fluent guess it is meant to catch.
+
+What happens next: an AI draft with an unsupported or contradicted claim is replaced by an answer built from the rows, and the draft is kept (shown under "Evidence check" and graded by the evaluation). Hypotheses stay, marked in the answer. Every answer shows "Evidence check: N statements traced to the result", and each claim lists its evidence (for example "derived from change from row 2 to row 3 in net revenue").
+
+### Learning from corrections
+
+The agent already retries when SQL fails. It now also learns from **semantic** errors, where the SQL runs but computes the wrong thing for this shop.
+
+- Under every answer, **That's not quite right** offers structured correction types: wrong metric definition, wrong filter or period, wrong grouping, missing exclusion rule, or something else in your own words. Each type has concrete choices (e.g. "revenue excluding cancelled invoices", "the last 12 complete months", "by month", "leave out the United Kingdom").
+- DataDukaan works out the corrected answer (the AI is told what was wrong; with no AI, the offline engine applies the correction as an override) and shows it. Only when you choose **Remember this** is the correction kept: the question, the original SQL, the corrected SQL, the corrected rule in plain English, your reason, and a trigger term it detected ("sales", "last year").
+- On later questions the closest corrections are retrieved (question similarity after masking years, months, countries and numbers, plus the measure and breakdown each question is about) and used as few-shot lessons for the AI and as overrides for the offline engine. The same question again reuses the corrected SQL, still validated and re-run. The answer says "Using what you taught me: …".
+- Corrections apply narrowly by type: a lesson about what "sales" means doesn't touch a question that says "net revenue"; a lesson about country rankings doesn't change product rankings; a "by month" lesson doesn't override an explicit "by country".
+- Corrections are kept in the browser per user (like history), sent with each question, and never stored on the server. Corrected SQL sent back from the browser is validated like any other SQL before it runs. Saved answers are bypassed whenever a correction applies, because they are shared by everyone.
+- **What I've learned** lists every correction with its rule, your words, how often it was used, and the calculation before and after; each can be switched off or deleted.
 
 ### When the AI is unavailable
 
@@ -45,7 +103,9 @@ The **trap-question suite** has 18 team-written questions, each checked against 
 
 - **Landing page** (`#/`): what DataDukaan does, with a real example answer from the data.
 - **Sign in** (`#/signin`): enter your email, receive a 6-digit code, type it in. No passwords.
-- **Ask**, **Trap tests**, **How we count** and **Profile** need you to be signed in.
+- **Ask**, **Plan ahead**, **What I've learned**, **Trap tests**, **How we count** and **Profile** need you to be signed in.
+- **Plan ahead** (`#/ahead`): forecasts with ranges and the ranked action list.
+- **What I've learned** (`#/learned`): your remembered corrections.
 - **Profile** (`#/profile`): your name, role and store, your saved analyses, and sign out.
 
 How sign-in works (`backend/auth.py`):
@@ -73,8 +133,13 @@ flowchart LR
     DB -->|error| IE[inspect_error → fix SQL<br/>≤ 2 retries]
     IE --> V
     DB -->|rows| SUM[summarise from rows only]
-    SUM --> FE
-    API -->|/api/evaluation/run| EV[Trap suite<br/>agent vs reference SQL]
+    SUM --> CC[check_claims<br/>every statement vs rows + SQL]
+    CC --> FE
+    FE -->|corrections from this browser| MEM[Correction memory<br/>retrieve + apply]
+    MEM --> AG
+    AG -->|future / what to do| FC[Forecast tool +<br/>diagnose → recommend]
+    FC --> DB
+    API -->|/api/evaluation/*| EV[Trap, claim and<br/>learning suites]
     EV --> DB
 ```
 
@@ -86,6 +151,10 @@ flowchart LR
 | `execute_readonly_sql()` | `backend/db.py` |
 | `inspect_error()` | `_fix()` in `backend/agent.py` |
 | `run_trap_suite()` | `backend/evaluation.py`, `scripts/run_eval.py` |
+| `forecast()` | `backend/forecast.py` |
+| `diagnose()` / `recommend()` | `backend/actions.py` |
+| `check_claims()` | `backend/claims.py`, using `backend/sql_facts.py` |
+| `recall_corrections()` / `correct()` | `backend/memory.py`, `correct()` in `backend/agent.py` |
 
 ### Tech stack
 - **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Recharts, lucide-react (hash routes for landing, sign-in, app and profile)
@@ -153,6 +222,24 @@ The chart is drawn from the saved runs by `python scripts/make_chart.py`. Each b
 - **Groq run:** Groq's own rate limits moved the run across `gpt-oss-120b`, `qwen3.8-27b` and `gpt-oss-20b` (each test records which model answered), so the 18/18 covers that mix of models. In the first 18-question Groq run, 8 tests failed with "busy" because the longer instructions used up Groq's per-minute limit; the client now waits and retries when a provider says "try again in a few seconds" (up to 8 s), and the re-run passed 18/18.
 - **Offline engine caveat:** we wrote it with these 18 questions in view, so its 18/18 shows it covers them, not that it handles any wording.
 
+### Why tests fail (failure taxonomy)
+
+Pass/fail alone doesn't say what to fix, so every failed test is classified. For answers that ran, the agent's SQL is compared with the reference SQL by `backend/sql_facts.py`: **wrong metric definition**, **wrong filter or period**, **wrong grouping**, **missing exclusion rule**, or other. The rest are **guessed instead of asking back**, **asked back when the rules already answer it**, **did not refuse**, **AI unavailable** and **calculation failed to run**. With `--answers` (or the checkbox on the Trap tests page), each answer is also written and claim-checked, which adds **correct SQL, misread result** when the numbers are right but the written answer misstates them.
+
+### Evidence check suite (planted fluent guesses)
+
+[`eval/claim_suite.json`](eval/claim_suite.json) has 16 answers over real results: 11 with a planted mistake (an invented number, a misread number, the wrong measure, the wrong year, a wrong ranking, a wrong trend, a missing exclusion, a country not in the result, a wrong list size, two unsupported explanations) and 5 correct ones (including fair rounding, derived percentages and correctly stated exclusions) to catch false alarms. Result: **11/11 planted mistakes caught, 0 false alarms**. It runs live on the Trap tests page (no AI needed). We wrote these cases knowing how the checker works, so they show it covers these kinds of mistake, not every wording.
+
+### Learning suite (correction memory)
+
+[`eval/learning_suite.json`](eval/learning_suite.json) is the living counterpart to the fixed trap suite. Four shop-specific habits differ from the default rules: "sales" means revenue before returns, country rankings leave out the UK, "show revenue for a year" means month by month, and "last year" means the last 12 complete months. For each, one correction is taught through the same path as "That's not quite right". Then four questions are asked with and without it remembered: the same question, two similar ones (another year, another country, other words), and a **control** the correction must not change.
+
+| Engine | Similar questions right, before → after | Controls unchanged | Saved run |
+|---|---|---|---|
+| Offline engine | **0/12 → 12/12** | **4/4** | [`eval/results_learning_offline.json`](eval/results_learning_offline.json) |
+
+The AI version (corrections as few-shot lessons) runs with `python scripts/run_eval.py --learning` and from the Trap tests page; it has not been saved yet.
+
 ### Latency on the full data
 
 Measured by `python scripts/measure_latency.py` and saved in [`eval/latency.json`](eval/latency.json).
@@ -176,7 +263,7 @@ Almost all the time goes to the AI call; the database is never the bottleneck. T
 - Only one table is exposed.
 - The data ends in December 2011.
 
-Run it yourself: `python scripts/run_eval.py` (Gemini), `--offline` (rule engine) or `--chain` (full fallback chain). Latency: `python scripts/measure_latency.py`.
+Run it yourself: `python scripts/run_eval.py` (Gemini), `--offline` (rule engine) or `--chain` (full fallback chain); add `--answers` to claim-check the written answers. `--claims` runs the evidence check suite, `--learning [--offline]` the learning suite. Latency: `python scripts/measure_latency.py`. Unit tests: `python -m pytest tests`.
 
 ## Setup and running locally
 
@@ -196,7 +283,14 @@ Both the original dataset and the processed database are in the repo:
 ### API
 | Endpoint | Method | Purpose |
 |---|---|---|
-| `/api/ask` | POST | `{question, history[], conversation_id, inject_fault}` → clarification, refusal, or answer + SQL + rows + chart type + trace |
+| `/api/ask` | POST | `{question, history[], conversation_id, inject_fault, corrections[]}` → clarification, refusal, or answer + SQL + rows + chart type + claim check + applied corrections + trace |
+| `/api/correct` | POST | `{question, original_sql, type, choice, rationale}` → the corrected answer and the correction to remember (nothing is stored on the server) |
+| `/api/corrections/options` | GET | correction types and their choices |
+| `/api/forecast` | POST | `{metric, scope, key, horizon}` → history, forecast with 80%/95% ranges, model, back-test |
+| `/api/forecast/entities` | GET | countries and top products for the pickers |
+| `/api/actions` | GET | benchmarks, rules, diagnoses and ranked actions |
+| `/api/evaluation/claims` | GET | runs the evidence check suite live |
+| `/api/evaluation/learning` | POST | `{ids?, mode}` runs learning scenarios live (`/learning/suite`, `/learning/results` for the list and the saved run) |
 | `/api/schema` | GET | table and column definitions, row count, date range |
 | `/api/rules` | GET | the exact data and ambiguity rules given to the agent |
 | `/api/query/{id}` | GET | a past answer (in-memory, per server instance; the browser keeps its own history) |
