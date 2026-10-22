@@ -60,6 +60,12 @@ def forecast_answer(question: str, countries: list[str]) -> dict | None:
         "sql": f["sql"], "columns": ["month", f"forecast_{col}", "low_80", "high_80", "low_95", "high_95"],
         "rows": [[p["period"], p["value"], p["lo80"], p["hi80"], p["lo95"], p["hi95"]] for p in f["forecast"]],
         "chart_type": "forecast", "assumptions": assumptions, "forecast": f, "model": f"forecast: {f['model']['name']}",
+        # Numbers the answer quotes that are not cells of the table, for the claim check.
+        "evidence_numbers": [{"label": "forecast total", "value": f["total"]["value"]},
+                             {"label": "forecast total, low end of the 80% range", "value": f["total"]["lo80"]},
+                             {"label": "forecast total, high end of the 80% range", "value": f["total"]["hi80"]},
+                             {"label": "back-test error", "value": f["backtest"]["mape"]},
+                             {"label": "months forecast", "value": len(f["forecast"])}],
         "trace": [{"tool": "forecast", "status": "ok",
                    "detail": f"{f['metric']} for {f['label']}, {f['horizon']} months ahead, model {f['model']['name']} "
                              f"(back-test error {f['backtest']['mape']:.0%}); history from the read-only query shown"}],
@@ -75,9 +81,13 @@ def actions_answer() -> dict:
               + "; ".join(f"({a['rank']}) {a['title']}" for a in top) + ".")
     return {
         "status": "success", "kind": "actions", "answer": answer, "title": "Recommended actions",
-        "sql": None, "columns": ["rank", "severity", "action", "about", "at_stake_gbp"],
-        "rows": [[a["rank"], a["severity"], a["title"], a["entity"]["label"], a["at_stake_gbp"]] for a in plan["actions"]],
+        "sql": None, "columns": ["rank", "severity", "action", "about", "at_stake_gbp", "priority"],
+        "rows": [[a["rank"], a["severity"], a["title"], a["entity"]["label"], a["at_stake_gbp"], a["priority"]] for a in plan["actions"]],
         "chart_type": "none", "action_plan": plan, "model": "rules + forecasts",
+        "evidence_numbers": [{"label": "entities checked", "value": sum(c.values())}, {"label": "critical", "value": c["Critical"]},
+                             {"label": "to watch", "value": c["Watch"]}, {"label": "healthy", "value": c["Healthy"]},
+                             {"label": "product return rate benchmark", "value": plan["benchmarks"]["product_return_rate"]},
+                             {"label": "return value share benchmark", "value": plan["benchmarks"]["return_value_share"]}],
         "assumptions": [f"Benchmarks use {plan['benchmarks']['period']}: {plan['benchmarks']['product_return_rate']:.1%} of product "
                         f"units sold came back, and {plan['benchmarks']['return_value_share']:.1%} of sales value.",
                         "Actions are ranked by how serious the finding is and how much money is at stake."],
