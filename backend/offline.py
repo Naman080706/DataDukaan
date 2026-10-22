@@ -268,7 +268,11 @@ def plan_offline(question: str, history: list[dict] | None = None, ctx: Ctx | No
                            "net sales value is sales minus returns.")
         return {"action": "sql", "sql": sql, "assumptions": assumptions, "title": "Total transaction value vs net sales value"}
 
-    # Breakdown.
+    # Breakdown. "Which month was best?" ranks months; it isn't a total for the year.
+    rank_period = re.search(r"\b(?:which|what)\b.*?\b(month|quarter|year)\b|\b(?:best|top|highest|biggest|strongest|worst|lowest|weakest)"
+                            r"(?:[\s-]+(?:selling|sales|revenue|performing))?\s+(month|quarter|year)\b", q)
+    rank_dim = (rank_period.group(1) or rank_period.group(2)) if rank_period and re.search(
+        r"\b(best|top|highest|biggest|strongest|most|worst|lowest|weakest|least|fewest)\b", q) else None
     dim = None
     if re.search(r"\b(monthly|by month|per month|each month|month by month|trend)\b", q):
         dim = "month"
@@ -282,6 +286,8 @@ def plan_offline(question: str, history: list[dict] | None = None, ctx: Ctx | No
         dim = "country"
     elif re.search(r"\bcustomers?\b", q) and not re.search(r"\bhow many\b|\bnumber of\b|\bcount\b", q):
         dim = "customer"
+    elif rank_dim:  # only when the question isn't already about products, countries or customers
+        dim = rank_dim
     if ov.get("dim"):
         dim = None if ov["dim"] == "none" else ov["dim"]
 
@@ -343,8 +349,10 @@ def plan_offline(question: str, history: list[dict] | None = None, ctx: Ctx | No
     if dim == "customer":
         assumptions.append("Sales without a customer ID are left out of customer rankings.")
 
-    if is_time:
+    if is_time and dim != rank_dim:
         order, limit = "1 ASC", 200
+    elif is_time:  # "which month was best": every period, best (or worst) first
+        order, limit = f"{alias} {'ASC' if re.search(r'\b(least|lowest|fewest|worst|weakest)\b', q) else 'DESC'}", 200
     else:
         m = re.search(r"\b(?:top|bottom|first)\s+(\d{1,3})\b", q)
         limit = min(int(m.group(1)), 200) if m else 10

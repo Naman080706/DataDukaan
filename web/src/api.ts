@@ -261,6 +261,19 @@ export class ApiError extends Error {
   }
 }
 
+/** A plain-English message for any failed request (never raw JSON or status codes). */
+export function friendlyError(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 401) return "Your sign-in has expired. Sign in again to keep asking.";
+    if (e.status === 413 || e.status === 422) return "That request couldn't be processed. Start a new conversation and ask again.";
+    if (e.status === 429) return "DataDukaan is busy right now. Wait a moment and ask again.";
+    if (e.status >= 500) return "Something went wrong on the server. Ask again in a moment.";
+    if (e.message && !e.message.trim().startsWith("[") && !e.message.trim().startsWith("{")) return e.message;
+    return "That request couldn't be processed. Ask again.";
+  }
+  return "Couldn't reach DataDukaan. Check your internet connection and ask again.";
+}
+
 async function req<T>(path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";

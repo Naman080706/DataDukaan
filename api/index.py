@@ -3,7 +3,7 @@ import os
 import sys
 import uuid
 from collections import OrderedDict
-from typing import Literal
+from typing import Annotated, Literal
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -17,7 +17,7 @@ except ImportError:  # not installed on Vercel; env vars come from the project s
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
+from pydantic import BaseModel, BeforeValidator, Field  # noqa: E402
 
 from backend import actions, auth, client_agent, db, evaluation, forecast, memory  # noqa: E402
 from backend.agent import ask, correct  # noqa: E402
@@ -50,6 +50,11 @@ class Turn(BaseModel):
     sql: str | None = Field(default=None, max_length=4000)
 
 
+# Long conversations are trimmed to the latest turns rather than rejected (the agent reads only the last few anyway).
+MAX_TURNS = 12
+History = Annotated[list[Turn], BeforeValidator(lambda v: v[-MAX_TURNS:] if isinstance(v, list) else v)]
+
+
 class Correction(BaseModel):
     """One remembered correction. Kept in the user's browser and sent with each question (the server stores none)."""
     id: str = Field(max_length=40)
@@ -70,7 +75,7 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
     conversation_id: str | None = Field(default=None, max_length=100)
     # Only the last few turns reach the prompt; the cap stops oversized (costly) requests.
-    history: list[Turn] = Field(default=[], max_length=12)
+    history: History = []
     inject_fault: bool = False
     # "auto": saved answers, then AI, then offline engine. "offline": rule engine only (outage demo).
     mode: Literal["auto", "offline"] = "auto"
@@ -83,7 +88,7 @@ class CorrectRequest(BaseModel):
     type: Literal["wrong_metric", "wrong_period", "wrong_grouping", "missing_exclusion", "other"]
     choice: str | None = Field(default=None, max_length=40)
     rationale: str = Field(default="", max_length=1000)
-    history: list[Turn] = []
+    history: History = []
     mode: Literal["auto", "offline"] = "auto"
 
 
@@ -132,7 +137,7 @@ class Observation(BaseModel):
 
 class DatasetPlanRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
-    history: list[Turn] = []
+    history: History = []
     dataset: DatasetInfo
     mode: Literal["auto", "offline"] = "auto"
     observations: list[Observation] = Field(default=[], max_length=2)

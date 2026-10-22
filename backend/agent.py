@@ -170,7 +170,11 @@ def _check_ask_back(question: str, history: list[dict], user_msg: str, plan: dic
             f"question. It means: {rules_plan['title']}. Applicable rules: {' '.join(rules_plan.get('assumptions', []))} "
             f"Respond with action \"sql\".")
     retry = generate_json(PLANNER_SYSTEM, hint)
-    return retry if retry.get("action") == "sql" else plan
+    if retry.get("action") == "sql":
+        return retry
+    # The model still asked even though the rules define the question: answer with the rule-based plan instead.
+    step("clarify_check", "warn", "The model asked again, so the answer uses the built-in counting rules directly.")
+    return {**rules_plan, "_model": "counting rules (the AI asked an unneeded question)"}
 
 
 def ask(question: str, history: list[dict] | None = None, inject_fault: bool = False, summarize: bool = True,

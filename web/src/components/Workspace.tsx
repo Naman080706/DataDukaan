@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, Square } from "lucide-react";
-import { api, AskResponse, Correction, Turn } from "../api";
+import { api, friendlyError, AskResponse, Correction, Turn } from "../api";
 import ResultView from "./ResultView";
 import { useSpeech } from "../speech";
 import type { DatasetProfile } from "../localdb";
@@ -115,11 +115,15 @@ export default function Workspace({ email, dataset }: { email: string; dataset: 
     if (existing && viewSaved === existing.id) setViewSaved(null);
   }
 
+  // Only the latest turns are sent: the AI reads the last few for follow-ups, and long histories would be rejected.
   const history = (upTo = entries.length): Turn[] =>
-    entries.slice(0, upTo).flatMap((e) => [
-      { role: "user" as const, content: e.question },
-      ...(e.response ? [{ role: "assistant" as const, content: e.response.answer, sql: e.response.sql }] : []),
-    ]);
+    entries
+      .slice(0, upTo)
+      .flatMap((e) => [
+        { role: "user" as const, content: e.question },
+        ...(e.response ? [{ role: "assistant" as const, content: e.response.answer, sql: e.response.sql }] : []),
+      ])
+      .slice(-12);
 
   async function submit(q: string) {
     const question = q.trim();
@@ -140,7 +144,7 @@ export default function Workspace({ email, dataset }: { email: string; dataset: 
       const used = new Set((response.applied_corrections ?? []).map((c) => c.id));
       if (used.size) storeCorrections(email, loadCorrections(email).map((c) => (used.has(c.id) ? { ...c, uses: (c.uses ?? 0) + 1 } : c)));
     } catch (err) {
-      setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, error: String(err) } : e)));
+      setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, error: friendlyError(err) } : e)));
     } finally {
       setBusy(false);
     }
@@ -391,7 +395,7 @@ function Bill({
         </div>
       )}
 
-      {entry.error && <p className="mt-5 text-[15px] text-stamp">Couldn't get an answer: {entry.error}. Check your connection and ask again.</p>}
+      {entry.error && <p className="mt-5 text-[15px] text-stamp">{entry.error}</p>}
 
       {r && (
         <>
