@@ -2,8 +2,8 @@ import type { AskResponse } from "./api";
 
 // Per-browser persistence. Storage can be missing or full (private windows, quotas),
 // so every access is wrapped and the app works without it.
-const SESSION_KEY = "datadukaan.session.v1";
-const SAVED_KEY = "datadukaan.saved.v1";
+// Keys are per email, so two people signing in on one browser don't see each other's history.
+const key = (name: string, email: string) => `datadukaan.${name}.v1.${email}`;
 const MAX_ROWS = 200;
 const MAX_SAVED = 50;
 
@@ -39,20 +39,35 @@ function write(key: string, value: unknown) {
 
 const slim = (r: AskResponse): AskResponse => ({ ...r, rows: r.rows.slice(0, MAX_ROWS) });
 
-export function loadSession(): { conversationId: string; entries: StoredEntry[] } | null {
-  return read(SESSION_KEY, null);
+export function loadSession(email: string): { conversationId: string; entries: StoredEntry[] } | null {
+  return read(key("session", email), null);
 }
 
-export function saveSession(conversationId: string, entries: StoredEntry[]) {
+export function saveSession(email: string, conversationId: string, entries: StoredEntry[]) {
   // Unfinished requests are not stored; they could never complete after a reload.
   const done = entries.filter((e) => e.response || e.error).map((e) => (e.response ? { ...e, response: slim(e.response) } : e));
-  write(SESSION_KEY, { conversationId, entries: done });
+  write(key("session", email), { conversationId, entries: done });
 }
 
-export function loadSaved(): SavedAnalysis[] {
-  return read<SavedAnalysis[]>(SAVED_KEY, []);
+export function loadSaved(email: string): SavedAnalysis[] {
+  return read<SavedAnalysis[]>(key("saved", email), []);
 }
 
-export function storeSaved(items: SavedAnalysis[]) {
-  write(SAVED_KEY, items.slice(0, MAX_SAVED).map((s) => ({ ...s, response: slim(s.response) })));
+export function storeSaved(email: string, items: SavedAnalysis[]) {
+  write(key("saved", email), items.slice(0, MAX_SAVED).map((s) => ({ ...s, response: slim(s.response) })));
+}
+
+export interface Profile {
+  name: string;
+  role: string;
+  store: string;
+}
+
+export function loadProfile(email: string): Profile {
+  return read<Profile>(key("profile", email), { name: "", role: "", store: "" });
+}
+
+export function storeProfile(email: string, profile: Profile) {
+  write(key("profile", email), profile);
+  window.dispatchEvent(new Event("datadukaan:profile"));
 }

@@ -35,11 +35,11 @@ export function stampFor(e: Entry): StampKind | null {
   return { text: "Answered", color: "text-ledger" };
 }
 
-export default function Workspace() {
-  const [restored] = useState(loadSession);
+export default function Workspace({ email }: { email: string }) {
+  const [restored] = useState(() => loadSession(email));
   const [entries, setEntries] = useState<Entry[]>(() => restored?.entries ?? []);
   const [selected, setSelected] = useState<number | null>(() => (restored?.entries.length ? restored.entries.length - 1 : null));
-  const [saved, setSaved] = useState<SavedAnalysis[]>(loadSaved);
+  const [saved, setSaved] = useState<SavedAnalysis[]>(() => loadSaved(email));
   const [viewSaved, setViewSaved] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -54,8 +54,8 @@ export default function Workspace() {
 
   // Keep this session's questions and answers across page reloads (this browser only).
   useEffect(() => {
-    saveSession(conversationId, entries);
-  }, [conversationId, entries]);
+    saveSession(email, conversationId, entries);
+  }, [email, conversationId, entries]);
 
   function toggleSave(entry: Entry) {
     if (!entry.response) return;
@@ -68,7 +68,7 @@ export default function Workspace() {
           ...saved,
         ];
     setSaved(next);
-    storeSaved(next);
+    storeSaved(email, next);
     if (existing && viewSaved === existing.id) setViewSaved(null);
   }
 

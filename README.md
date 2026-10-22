@@ -33,6 +33,22 @@ The answer's stamp shows where it came from: "Answered", "Saved answer" or "Answ
 
 The **trap-question suite** has 15 team-written questions, each checked against hand-written reference SQL. The app can run it live and shows pass/fail per question.
 
+### Pages and sign-in
+
+- **Landing page** (`#/`): what DataDukaan does, with a real example answer from the data.
+- **Sign in** (`#/signin`): enter your email, receive a 6-digit code, type it in. No passwords.
+- **Ask**, **Trap tests**, **How we count** and **Profile** need you to be signed in.
+- **Profile** (`#/profile`): your name, role and store, your saved analyses, and sign out.
+
+How sign-in works (`backend/auth.py`):
+1. The backend makes the 6-digit code and emails it through the **EmailJS** REST API. The code never reaches the browser.
+2. The browser gets back a signed "challenge" (email, expiry, and an HMAC of the code made with `AUTH_SECRET`). Codes expire after 10 minutes, a new code can be requested every 45 seconds, and 5 wrong tries end the attempt.
+3. A correct code returns a signed session token that lasts 7 days. Every data endpoint (`/api/ask`, `/api/evaluation/*`, `/api/schema`, `/api/rules`) checks it; without it they return 401.
+
+Everything is stateless, so it works on serverless hosting with no user database. Profile details, history and saved analyses are stored in the browser per email. The retry limits are kept in memory per server instance, so they're best-effort on serverless.
+
+**EmailJS setup:** create an email service and a template whose "To email" is `{{to_email}}` and whose body uses `{{passcode}}` (also available: `{{expires_in}}`, `{{app_name}}`). In Account > Security, enable "Allow EmailJS API for non-browser applications". Then set `EMAILJS_SERVICE_ID`, `EMAILJS_TEMPLATE_ID`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_PRIVATE_KEY` and `AUTH_SECRET` (see `.env.example`), locally and in Vercel.
+
 ## Architecture
 
 ```mermaid
@@ -64,10 +80,11 @@ flowchart LR
 | `run_trap_suite()` | `backend/evaluation.py`, `scripts/run_eval.py` |
 
 ### Tech stack
-- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Recharts, lucide-react
+- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Recharts, lucide-react (hash routes for landing, sign-in, app and profile)
 - **Backend:** Python 3.12+, FastAPI, Pydantic, DuckDB 2.0, sqlglot, httpx
 - **LLM:** Google Gemini API (`gemini-3.5-flash` with low thinking for SQL, `gemini-3.5-flash-lite` for summaries, falling back to other Gemini models on rate limits), then Groq (optional key), then the offline rule engine
 - **Preprocessing:** pandas, openpyxl, pyarrow (run once)
+- **Sign-in:** EmailJS for sending one-time codes; HMAC-signed challenges and sessions (Python standard library)
 - **Hosting:** Vercel (static frontend and a Python serverless function)
 - **AI coding tools:** Claude Code (Anthropic) assisted with writing code.
 
@@ -174,7 +191,10 @@ npm --prefix web install && npm --prefix web run dev   # frontend on http://loca
 | `/api/evaluation/suite` | GET | trap-suite questions and reference SQL |
 | `/api/evaluation/run` | POST | `{ids?}` runs the selected tests (or all) live |
 | `/api/evaluation/results` | GET | the last saved run (`?mode=llm` or `offline`) |
-| `/api/health` | GET | database and LLM-key readiness |
+| `/api/health` | GET | database, AI-key and email sign-in readiness (no sign-in needed) |
+| `/api/auth/request-code` | POST | `{email}`: emails a 6-digit code, returns a signed challenge |
+| `/api/auth/verify` | POST | `{challenge, code}`: returns a session token |
+| `/api/auth/me` | GET | the signed-in email and session dates |
 
 ### Deployment (Vercel)
 `vercel.json` builds `web/` as static files and serves `api/index.py` as a Python function, bundling `backend/`, `data/retail.duckdb` and `eval/` with it. Set `GEMINI_API_KEY` in the Vercel project's environment variables.

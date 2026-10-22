@@ -1,3 +1,5 @@
+import { currentToken, signOut } from "./auth";
+
 export type Cell = string | number | boolean | null;
 
 export interface TraceStep {
@@ -69,18 +71,38 @@ export interface EvalRun {
   results: TestResult[];
 }
 
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
 async function req<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const token = currentToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(path, { method: body === undefined ? "GET" : "POST", headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (!res.ok) {
+    let detail = (await res.text()).slice(0, 300);
+    try {
+      const parsed = JSON.parse(detail).detail;
+      detail = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+    } catch {
+      // keep the raw text
+    }
+    // An expired or invalid session sends the user back to sign in.
+    if (res.status === 401 && !path.startsWith("/api/auth/")) signOut();
+    throw new ApiError(res.status, detail);
+  }
   return res.json();
 }
 
 export const api = {
-  health: () => req<{ status: string; database: string; rows?: number; llm_configured?: boolean; providers?: string[] }>("/api/health"),
+  health: () =>
+    req<{ status: string; database: string; rows?: number; llm_configured?: boolean; providers?: string[]; email_sign_in?: boolean }>("/api/health"),
+  requestCode: (email: string) => req<{ challenge: string; expires_in: number }>("/api/auth/request-code", { email }),
+  verifyCode: (challenge: string, code: string) => req<{ token: string; email: string; expires_in: number }>("/api/auth/verify", { challenge, code }),
   schema: () => req<{ tables: { name: string; columns: { name: string; type: string }[] }[]; row_count: number; date_range: string[] }>("/api/schema"),
   rules: () => req<{ data_rules: string; ambiguity_rules: string; non_product_codes: string[]; dataset_range: string[] }>("/api/rules"),
   ask: (question: string, history: Turn[], conversation_id: string, inject_fault = false, mode: "auto" | "offline" = "auto") =>
