@@ -7,17 +7,22 @@ import DataRules from "./components/DataRules";
 import Landing from "./components/Landing";
 import SignIn from "./components/SignIn";
 import Profile from "./components/Profile";
+import PlanAhead from "./components/PlanAhead";
+import Learned from "./components/Learned";
 import { loadProfile } from "./storage";
 
 // Hash routes keep this a static site (no server rewrites needed on Vercel).
-type Route = "home" | "signin" | "ask" | "tests" | "rules" | "profile";
+type Route = "home" | "signin" | "ask" | "ahead" | "learned" | "tests" | "rules" | "profile";
 const ROUTES: Record<string, Route> = {
-  "": "home", "#/": "home", "#/signin": "signin", "#/ask": "ask", "#/tests": "tests", "#/rules": "rules", "#/profile": "profile",
+  "": "home", "#/": "home", "#/signin": "signin", "#/ask": "ask", "#/ahead": "ahead", "#/learned": "learned", "#/tests": "tests",
+  "#/rules": "rules", "#/profile": "profile",
 };
-const NEEDS_SIGN_IN: Route[] = ["ask", "tests", "rules", "profile"];
+const NEEDS_SIGN_IN: Route[] = ["ask", "ahead", "learned", "tests", "rules", "profile"];
 
 const NAV: { route: Route; label: string }[] = [
   { route: "ask", label: "Ask" },
+  { route: "ahead", label: "Plan ahead" },
+  { route: "learned", label: "What I've learned" },
   { route: "tests", label: "Trap tests" },
   { route: "rules", label: "How we count" },
 ];
@@ -81,7 +86,7 @@ export default function App() {
               <span className="mt-1 block text-[13px] text-muted">Ask the shop's sales ledger in plain English</span>
             </span>
           </a>
-          <nav className="flex flex-1 gap-6" role="tablist">
+          <nav className="flex flex-1 gap-x-6 gap-y-1 overflow-x-auto" role="tablist">
             {NAV.map(({ route: r, label }) => (
               <a key={r} href={`#/${r}`} role="tab" aria-selected={route === r} className="tab text-[15px]">
                 {label}
@@ -96,6 +101,8 @@ export default function App() {
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
         {route === "ask" && session && <Workspace key={session.email} email={session.email} />}
+        {route === "ahead" && <PlanAhead />}
+        {route === "learned" && session && <Learned key={session.email} email={session.email} />}
         {route === "tests" && <Evaluation />}
         {route === "rules" && <DataRules />}
         {route === "profile" && session && <Profile session={session} />}

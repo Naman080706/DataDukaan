@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { api, AskResponse, Turn } from "../api";
+import { api, AskResponse, Correction, Turn } from "../api";
 import ResultView from "./ResultView";
-import { loadSaved, loadSession, SavedAnalysis, saveSession, storeSaved } from "../storage";
+import CorrectionPanel from "./CorrectionPanel";
+import { AnswerText, EvidencePanel } from "./Evidence";
+import { loadCorrections, loadSaved, loadSession, SavedAnalysis, saveSession, storeCorrections, storeSaved } from "../storage";
 
 const SUGGESTED = [
   "What were the top 5 products by revenue?",
@@ -11,6 +13,8 @@ const SUGGESTED = [
   "Who are our best customers?",
   "Show monthly net revenue in 2011",
   "Which country generated the highest net revenue?",
+  "What should I expect for revenue next month?",
+  "What should we do about returns?",
 ];
 
 interface Entry {
@@ -30,6 +34,9 @@ export function stampFor(e: Entry): StampKind | null {
   if (r.status === "unavailable") return { text: "Can't answer", color: "text-stamp" };
   if (r.status !== "success") return { text: "Failed", color: "text-stamp" };
   if (r.attempts > 1) return { text: "Fixed & re-run", color: "text-gold-deep" };
+  if (r.kind === "forecast") return { text: "Forecast", color: "text-gold-deep" };
+  if (r.kind === "actions") return { text: "Action list", color: "text-ledger" };
+  if (r.source === "learned" || r.applied_corrections?.length) return { text: "Learned from you", color: "text-ledger" };
   if (r.source === "offline") return { text: "Answered (backup)", color: "text-ledger" };
   if (r.source === "saved") return { text: "Saved answer", color: "text-ledger" };
   return { text: "Answered", color: "text-ledger" };
@@ -46,7 +53,14 @@ export default function Workspace({ email }: { email: string }) {
   const [injectFault, setInjectFault] = useState(false);
   const [simulateOutage, setSimulateOutage] = useState(false);
   const [conversationId, setConversationId] = useState(() => restored?.conversationId ?? crypto.randomUUID());
+  const [corrections, setCorrections] = useState<Correction[]>(() => loadCorrections(email));
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const update = () => setCorrections(loadCorrections(email));
+    window.addEventListener("datadukaan:corrections", update);
+    return () => window.removeEventListener("datadukaan:corrections", update);
+  }, [email]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -72,8 +86,8 @@ export default function Workspace({ email }: { email: string }) {
     if (existing && viewSaved === existing.id) setViewSaved(null);
   }
 
-  const history = (): Turn[] =>
-    entries.flatMap((e) => [
+  const history = (upTo = entries.length): Turn[] =>
+    entries.slice(0, upTo).flatMap((e) => [
       { role: "user" as const, content: e.question },
       ...(e.response ? [{ role: "assistant" as const, content: e.response.answer, sql: e.response.sql }] : []),
     ]);
@@ -88,13 +102,23 @@ export default function Workspace({ email }: { email: string }) {
     setSelected(idx);
     setViewSaved(null);
     try {
-      const response = await api.ask(question, history(), conversationId, injectFault, simulateOutage ? "offline" : "auto");
+      const response = await api.ask(question, history(), conversationId, injectFault, simulateOutage ? "offline" : "auto", corrections.filter((c) => c.enabled));
       setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, response } : e)));
+      const used = new Set((response.applied_corrections ?? []).map((c) => c.id));
+      if (used.size) storeCorrections(email, loadCorrections(email).map((c) => (used.has(c.id) ? { ...c, uses: (c.uses ?? 0) + 1 } : c)));
     } catch (err) {
       setEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, error: String(err) } : e)));
     } finally {
       setBusy(false);
     }
+  }
+
+  // A kept correction: remember it, and show the corrected answer as the next stub.
+  function remember(question: string, c: Correction, result: AskResponse) {
+    storeCorrections(email, [c, ...loadCorrections(email)]);
+    setEntries((prev) => [...prev, { question: `${question} (corrected)`, response: result }]);
+    setSelected(entries.length);
+    setViewSaved(null);
   }
 
   function startOver() {
@@ -186,6 +210,18 @@ export default function Workspace({ email }: { email: string }) {
               isLatest={!savedView && selected === entries.length - 1}
               saved={isSaved(current)}
               onToggleSave={() => toggleSave(current)}
+              correction={
+                current.response && !savedView && selected !== null ? (
+                  <CorrectionPanel
+                    key={current.response.id}
+                    question={current.question.replace(/ \(corrected\)$/, "")}
+                    response={current.response}
+                    history={history(selected)}
+                    offline={simulateOutage}
+                    onRemember={(c, result) => remember(current.question.replace(/ \(corrected\)$/, ""), c, result)}
+                  />
+                ) : null
+              }
             />
           )}
         </section>
@@ -266,6 +302,7 @@ function Bill({
   isLatest,
   saved,
   onToggleSave,
+  correction,
 }: {
   entry: Entry;
   onOption: (q: string) => void;
@@ -273,6 +310,7 @@ function Bill({
   isLatest: boolean;
   saved: boolean;
   onToggleSave: () => void;
+  correction: React.ReactNode;
 }) {
   const r = entry.response;
   const s = stampFor(entry);
@@ -297,7 +335,18 @@ function Bill({
 
       {r && (
         <>
-          <p className={`mt-4 max-w-3xl leading-snug ${r.status === "success" && r.answer.length < 160 ? "text-[24px] font-medium" : "text-[18px]"}`}>{r.answer}</p>
+          <p className={`mt-4 max-w-3xl leading-snug ${r.status === "success" && r.answer.length < 160 ? "text-[24px] font-medium" : "text-[18px]"}`}>
+            <AnswerText text={r.answer} check={r.claims} />
+          </p>
+          {r.status === "success" && <EvidencePanel check={r.claims} draft={r.draft_answer} draftCheck={r.draft_claims} />}
+          {!!r.applied_corrections?.length && (
+            <p className="mt-3 max-w-3xl text-[13.5px] leading-snug text-ledger">
+              Using what you taught me: {r.applied_corrections.map((c) => c.rule).join(" ")}{" "}
+              <a href="#/learned" className="font-medium underline underline-offset-2">
+                See what I've learned
+              </a>
+            </p>
+          )}
 
           {r.status === "clarification" && !!r.options?.length && (
             <div className="margin-rule mt-6 max-w-xl">
@@ -317,6 +366,7 @@ function Bill({
                 {saved ? "Remove from saved analyses" : "Save this analysis"}
               </button>
               <ResultView r={r} />
+              {r.sql && !r.kind && correction}
             </>
           )}
         </>
