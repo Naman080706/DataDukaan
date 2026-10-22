@@ -109,6 +109,13 @@ export const api = {
     req<AskResponse>("/api/ask", { question, history, conversation_id, inject_fault, mode }),
   suite: () => req<TestCase[]>("/api/evaluation/suite"),
   runTests: (ids: string[], mode: EvalMode) => req<EvalRun>("/api/evaluation/run", { ids, mode }),
+  // A user's own dataset: the server plans/fixes/summarises, the browser runs the SQL.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  datasetPlan: (question: string, history: Turn[], dataset: unknown, mode: "auto" | "offline") => req<any>("/api/dataset/plan", { question, history, dataset, mode }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  datasetFix: (question: string, sql: string, error: string, dataset: unknown) => req<any>("/api/dataset/fix", { question, sql, error, dataset }),
+  datasetSummarise: (question: string, title: string, assumptions: string[], columns: string[], rows: Cell[][], source: "ai" | "offline") =>
+    req<{ answer: string; chart_type: "bar" | "line" | "none"; summary_by: string }>("/api/dataset/summarise", { question, title, assumptions, columns, rows, source }),
   savedResults: (mode: EvalMode) => req<EvalRun>(`/api/evaluation/results?mode=${mode}`),
 };
 
@@ -131,11 +138,11 @@ export function downloadCSV(name: string, columns: string[], rows: Cell[][]) {
 
 const MONEY_HINT = /(revenue|value|gbp|sales|amount|price|spend|total)/i;
 
-export function formatCell(col: string, v: Cell): string {
+export function formatCell(col: string, v: Cell, currency = "£"): string {
   if (v === null) return "—";
   if (typeof v === "number") {
     if (MONEY_HINT.test(col) && !/(units|count|qty|quantity|invoices|orders|customers)/i.test(col))
-      return "£" + v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return currency + v.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return v.toLocaleString("en-GB", { maximumFractionDigits: 2 });
   }
   return String(v);
@@ -162,7 +169,7 @@ const COLUMN_WORDS: Record<string, string> = {
 export function prettyColumn(col: string): string {
   if (COLUMN_WORDS[col]) return COLUMN_WORDS[col];
   const money = /_gbp$/i.test(col);
-  const words = col.replace(/_gbp$/i, "").replace(/_/g, " ").trim();
+  const words = col.replace(/_(gbp|value)$/i, "").replace(/_/g, " ").trim();
   const text = words.charAt(0).toUpperCase() + words.slice(1);
   return money ? `${text} (£)` : text;
 }

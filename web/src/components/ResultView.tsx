@@ -7,6 +7,7 @@ type Tab = "chart" | "table" | "sql" | "steps";
 const TAB_LABEL: Record<Tab, string> = { chart: "Chart", table: "Table", sql: "How it was worked out", steps: "Step by step" };
 
 export default function ResultView({ r }: { r: AskResponse }) {
+  const sym = r.currency === "GBP" ? "£" : ""; // a user's own file: currency unknown, so no symbol
   const hasChart = r.chart_type !== "none";
   const [tab, setTab] = useState<Tab>(hasChart ? "chart" : "table");
   const tabs: Tab[] = hasChart ? ["chart", "table", "sql", "steps"] : ["table", "sql", "steps"];
@@ -32,7 +33,7 @@ export default function ResultView({ r }: { r: AskResponse }) {
         </span>
       </div>
       <div className="pt-4">
-        {tab === "table" && <SortableTable columns={r.columns} rows={r.rows} />}
+        {tab === "table" && <SortableTable columns={r.columns} rows={r.rows} currency={sym} />}
         {tab === "chart" && <AutoChart r={r} />}
         {tab === "sql" && (
           <div>
@@ -49,7 +50,9 @@ export default function ResultView({ r }: { r: AskResponse }) {
   );
 }
 
-export function SortableTable({ columns, rows, max = 200, exportable = true }: { columns: string[]; rows: Cell[][]; max?: number; exportable?: boolean }) {
+export function SortableTable({
+  columns, rows, max = 200, exportable = true, currency = "£",
+}: { columns: string[]; rows: Cell[][]; max?: number; exportable?: boolean; currency?: string }) {
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -83,7 +86,7 @@ export function SortableTable({ columns, rows, max = 200, exportable = true }: {
               <tr key={ri}>
                 {row.map((v, ci) => (
                   <td key={ci} className={typeof v === "number" ? "narrow whitespace-nowrap text-right text-[15px]" : ""}>
-                    {formatCell(columns[ci], v)}
+                    {formatCell(columns[ci], v, currency)}
                   </td>
                 ))}
               </tr>
@@ -109,7 +112,7 @@ function AutoChart({ r }: { r: AskResponse }) {
   const labelIdx = Math.max(0, r.columns.findIndex((_, i) => i < valueIdx && new Set(r.rows.map((row) => String(row[i]))).size > 1));
   const useDesc = descIdx > 0 && r.chart_type === "bar";
   const data = r.rows.map((row) => ({ label: String(useDesc ? row[descIdx] ?? row[labelIdx] : row[labelIdx]).slice(0, 30), value: row[valueIdx] as number }));
-  const fmt = (v: number) => formatCell(valueCol, v);
+  const fmt = (v: number) => formatCell(valueCol, v, r.currency === "GBP" ? "£" : "");
   const compact = (v: number) => Intl.NumberFormat("en-GB", { notation: "compact" }).format(v);
   const axis = { fontSize: 12, fill: "#6B6F66", fontFamily: "Archivo" };
   return (
