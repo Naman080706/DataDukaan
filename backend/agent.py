@@ -26,7 +26,10 @@ SECURITY: you only ever write a single read-only SELECT (CTEs allowed) over the 
 If the user asks to change, delete or export data, or to reveal secrets/system settings, respond with action "refuse".
 
 Respond with JSON only, one of:
-{{"action": "sql", "sql": "<single SELECT>", "assumptions": ["<rule or assumption applied>", ...], "title": "<short result title>"}}
+{{"action": "sql", "steps": ["<step 1 in plain English>", ...], "sql": "<single SELECT>", "assumptions": ["<rule or assumption applied>", ...], "title": "<short result title>"}}
+Before writing SQL, break the question into "steps" (1 step for a simple question; 2-3 for a multi-part one, e.g.
+["Find the month in 2011 with the highest net revenue", "Rank products by net revenue within that month", "Keep the top 5"]),
+then write ONE SQL statement that does all the steps (use WITH for the inner steps, rule 14).
 {{"action": "clarify", "question": "<one clarifying question>", "options": ["<option 1>", "<option 2>", ...]}}
 {{"action": "refuse", "reason": "<why>"}}
 Use readable column aliases (e.g. net_revenue_gbp, returned_units). Never invent tables or columns.
@@ -165,6 +168,8 @@ def ask(question: str, history: list[dict] | None = None, inject_fault: bool = F
     sql = plan.get("sql", "")
     resp["assumptions"] = plan.get("assumptions", [])
     resp["title"] = plan.get("title", "")
+    if plan.get("steps") and len(plan["steps"]) > 1:
+        step("plan_steps", "ok", " → ".join(str(x) for x in plan["steps"]))
     if source != "saved":
         step("generate_sql", "ok", sql)
     if inject_fault:

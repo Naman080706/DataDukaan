@@ -63,7 +63,33 @@ DATA RULES (apply to every query unless the user explicitly asks otherwise):
     Q3 2011 = invoice_date >= '{LAST_FULL_QUARTER[0]}' AND invoice_date < '{LAST_FULL_QUARTER[1]}';
     Q4 2011 so far = invoice_date >= '2011-10-01' AND invoice_date < '2012-01-01'.
     November 2011 = '2011-11-01' to '2011-12-01'; December 2011 so far = '2011-12-01' to '2012-01-01'.
+    "This year" = 2011 and "last year" = 2010 (the latest year in the data and the one before it). Do NOT ask; state
+    the assumption ("This year means 2011, the latest year in the data; it ends on 9 December 2011.").
 12. Always add a LIMIT (<= 200) for row-level or ranking results.
+13. "Best / top / highest / biggest" month, quarter, country, customer or product = highest NET revenue unless another
+    measure is named ("best month for returns" = most units returned). "Worst / lowest" = lowest net revenue.
+    "Best sales month" = the calendar month with the highest net revenue.
+14. MULTI-STEP QUESTIONS: when one part of the question depends on the answer to another part (e.g. "top products in the
+    best month", "top countries for the best-selling product", "returns in the country with the highest revenue"),
+    answer it in ONE statement with WITH (CTE) steps: first compute the inner answer, then filter by it. Also return the
+    inner answer as a column (e.g. best_month) so the user can see which month/country was used.
+    Example: "top 5 products by revenue in the best sales month of 2011" ->
+      WITH best_month AS (
+        SELECT date_trunc('month', invoice_date) AS month FROM transactions
+        WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'
+        GROUP BY 1 ORDER BY SUM(line_value) DESC LIMIT 1)
+      SELECT strftime((SELECT month FROM best_month), '%Y-%m') AS best_month, stock_code,
+             any_value(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp
+      FROM transactions
+      WHERE line_type IN ('sale', 'cancellation') AND is_product
+        AND date_trunc('month', invoice_date) = (SELECT month FROM best_month)
+      GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5
+    Example: "which country returned the most units of the best-selling product?" ->
+      WITH top_product AS (SELECT stock_code FROM transactions WHERE line_type = 'sale' AND is_product
+                           GROUP BY stock_code ORDER BY SUM(quantity) DESC LIMIT 1)
+      SELECT country, any_value(description) AS product, SUM(-quantity) AS returned_units FROM transactions
+      WHERE line_type = 'cancellation' AND stock_code = (SELECT stock_code FROM top_product)
+      GROUP BY country ORDER BY returned_units DESC LIMIT 10
 """.strip()
 
 AMBIGUITY_RULES = f"""
@@ -80,4 +106,7 @@ Do NOT ask when the data rules above already define the term. These are defined,
 - "revenue", "sales", "most revenue", "highest revenue" -> net revenue (rule 4); "excluding cancelled" -> gross (rule 3).
 - "returned most" -> units returned; "returned most often/frequently" -> number of return invoices (rule 2).
 - "customers who generated the most revenue" names the metric, so do not ask.
+- "this year" -> 2011, "last year" -> 2010 (rule 11); "best month", "best sales month", "best country" -> by net revenue (rule 13).
+- Multi-part questions ("top products in the best month of this year") are NOT ambiguous just because they have
+  several parts: break them into steps (rule 14) and answer.
 """.strip()
