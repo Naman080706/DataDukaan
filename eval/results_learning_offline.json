@@ -1,0 +1,486 @@
+{
+  "mode": "offline",
+  "run_at": "2026-10-22T07:47:09+00:00",
+  "learn_total": 12,
+  "learn_before": 0,
+  "learn_after": 12,
+  "control_total": 4,
+  "control_before": 4,
+  "control_after": 4,
+  "scenarios": [
+    {
+      "id": "L01",
+      "type": "wrong_metric",
+      "pattern": "This shop means revenue before returns when it says \"sales\"",
+      "teach": {
+        "question": "What were total sales in 2011?",
+        "choice": "gross",
+        "rationale": "For me, sales means what we sold, before returns."
+      },
+      "learned": {
+        "id": "f25f1368b9",
+        "created_at": "2026-10-22T07:47:09+00:00",
+        "type": "wrong_metric",
+        "choice": "gross",
+        "choice_label": "Revenue excluding cancelled invoices",
+        "question": "What were total sales in 2011?",
+        "original_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+        "corrected_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+        "rule": "When I say \u201csales\u201d, count revenue excluding cancelled invoices.",
+        "rationale": "For me, sales means what we sold, before returns.",
+        "override": {
+          "measure": "gross"
+        },
+        "term": "sales",
+        "title": "Revenue excluding cancelled invoices in 2011",
+        "assumptions": [
+          "2011 data ends on 9 December 2011.",
+          "Only sales are counted; cancelled orders, stock write-offs and free items are left out."
+        ],
+        "enabled": true
+      },
+      "taught_status": "success",
+      "original_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+      "probes": [
+        {
+          "role": "repeat",
+          "question": "What were total sales in 2011?",
+          "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+          "before": {
+            "passed": false,
+            "reason": "expected [9831894.34], got [9009870.97]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "matched [9831894.34]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+            "source": "learned",
+            "applied": [
+              "When I say \u201csales\u201d, count revenue excluding cancelled invoices."
+            ]
+          }
+        },
+        {
+          "role": "paraphrase",
+          "question": "What were total sales in 2010?",
+          "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+          "before": {
+            "passed": false,
+            "reason": "expected [9865099.74], got [9247658.1]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "matched [9865099.74]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+            "source": "offline",
+            "applied": [
+              "When I say \u201csales\u201d, count revenue excluding cancelled invoices."
+            ]
+          }
+        },
+        {
+          "role": "paraphrase",
+          "question": "Total sales for Germany in 2011?",
+          "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND country = 'Germany' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+          "before": {
+            "passed": false,
+            "reason": "expected [213626.0], got [207135.37]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND country = 'Germany'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "matched [213626.0]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND country = 'Germany'",
+            "source": "offline",
+            "applied": [
+              "When I say \u201csales\u201d, count revenue excluding cancelled invoices."
+            ]
+          }
+        },
+        {
+          "role": "control",
+          "question": "What was net revenue in 2011?",
+          "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+          "before": {
+            "passed": true,
+            "reason": "matched [9009870.97]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "matched [9009870.97]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+            "source": "offline",
+            "applied": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "L02",
+      "type": "missing_exclusion",
+      "pattern": "Country rankings should leave out the home market (UK)",
+      "teach": {
+        "question": "Which country had the highest net revenue?",
+        "choice": "uk",
+        "rationale": "I want to see export markets; the UK always wins."
+      },
+      "learned": {
+        "id": "f08c2111c5",
+        "created_at": "2026-10-22T07:47:09+00:00",
+        "type": "missing_exclusion",
+        "choice": "uk",
+        "choice_label": "Leave out the United Kingdom",
+        "question": "Which country had the highest net revenue?",
+        "original_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+        "corrected_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+        "rule": "For questions like this, leave out the United Kingdom.",
+        "rationale": "I want to see export markets; the UK always wins.",
+        "override": {
+          "exclude": [
+            "uk"
+          ]
+        },
+        "term": null,
+        "title": "Net revenue (sales minus returns) by country",
+        "assumptions": [
+          "Net revenue is sales minus returns."
+        ],
+        "enabled": true
+      },
+      "taught_status": "success",
+      "original_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+      "probes": [
+        {
+          "role": "repeat",
+          "question": "Which country had the highest net revenue?",
+          "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5",
+          "before": {
+            "passed": false,
+            "reason": "expected top 5 ['EIRE', 'Netherlands', 'Germany', 'France', 'Australia'], got rows [['United Kingdom', 16186215.72], ['EIRE', 610244.27], ['Netherlands', 548332.35], ['Germany', 412517.83], ['France', 321928.53]]",
+            "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "top 5 match: ['EIRE', 'Netherlands', 'Germany', 'France', 'Australia']",
+            "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+            "source": "learned",
+            "applied": [
+              "For questions like this, leave out the United Kingdom."
+            ]
+          }
+        },
+        {
+          "role": "paraphrase",
+          "question": "Which countries generated the most revenue in 2011?",
+          "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5",
+          "before": {
+            "passed": false,
+            "reason": "expected top 5 ['Netherlands', 'EIRE', 'Germany', 'France', 'Australia'], got rows [['United Kingdom', 7522125.8], ['Netherlands', 275877.06], ['EIRE', 254246.87], ['Germany', 207135.37], ['France', 187846.54]]",
+            "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "top 5 match: ['Netherlands', 'EIRE', 'Germany', 'France', 'Australia']",
+            "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' AND country <> 'United Kingdom' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+            "source": "offline",
+            "applied": [
+              "For questions like this, leave out the United Kingdom."
+            ]
+          }
+        },
+        {
+          "role": "paraphrase",
+          "question": "Top 5 countries by net revenue in 2010",
+          "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5",
+          "before": {
+            "passed": false,
+            "reason": "expected top 5 ['EIRE', 'Netherlands', 'Germany', 'France', 'Sweden'], got rows [['United Kingdom', 7936433.96], ['EIRE', 336869.46], ['Netherlands', 257250.56], ['Germany', 195599.84], ['France', 128526.95]]",
+            "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "top 5 match: ['EIRE', 'Netherlands', 'Germany', 'France', 'Sweden']",
+            "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' AND country <> 'United Kingdom' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5",
+            "source": "offline",
+            "applied": [
+              "For questions like this, leave out the United Kingdom."
+            ]
+          }
+        },
+        {
+          "role": "control",
+          "question": "Which products had the highest net revenue?",
+          "reference_sql": "SELECT stock_code, any_value(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND is_product GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5",
+          "before": {
+            "passed": true,
+            "reason": "top 5 match: ['22423', '85123A', '85099B', '47566', '84879']",
+            "sql": "SELECT stock_code, any_value(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND is_product GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 10",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "top 5 match: ['22423', '85123A', '85099B', '47566', '84879']",
+            "sql": "SELECT stock_code, any_value(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND is_product GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 10",
+            "source": "offline",
+            "applied": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "L03",
+      "type": "wrong_grouping",
+      "pattern": "\"Show revenue for a year\" means the month-by-month picture",
+      "teach": {
+        "question": "Show revenue for 2011",
+        "choice": "month",
+        "rationale": "When I say show, I want to see each month."
+      },
+      "learned": {
+        "id": "db2d80574a",
+        "created_at": "2026-10-22T07:47:09+00:00",
+        "type": "wrong_grouping",
+        "choice": "month",
+        "choice_label": "By month",
+        "question": "Show revenue for 2011",
+        "original_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+        "corrected_sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1 ASC LIMIT 200",
+        "rule": "For questions like this, break it down by month.",
+        "rationale": "When I say show, I want to see each month.",
+        "override": {
+          "dim": "month"
+        },
+        "term": null,
+        "title": "Net revenue (sales minus returns) by month in 2011",
+        "assumptions": [
+          "2011 data ends on 9 December 2011.",
+          "Net revenue is sales minus returns."
+        ],
+        "enabled": true
+      },
+      "taught_status": "success",
+      "original_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+      "probes": [
+        {
+          "role": "repeat",
+          "question": "Show revenue for 2011",
+          "reference_sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1",
+          "before": {
+            "passed": false,
+            "reason": "expected top 1 ['2011-01'], got rows [[9009870.97]]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "top 12 match: ['2011-01', '2011-02', '2011-03', '2011-04', '2011-05', '2011-06', '2011-07', '2011-08', '2011-09', '2011-10', '2011-11', '2011-12']",
+            "sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1 ASC LIMIT 200",
+            "source": "learned",
+            "applied": [
+              "For questions like this, break it down by month."
+            ]
+          }
+        },
+        {
+          "role": "paraphrase",
+          "question": "Show revenue for 2010",
+          "reference_sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY 1 ORDER BY 1",
+          "before": {
+            "passed": false,
+            "reason": "expected top 1 ['2010-01'], got rows [[9247658.1]]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "top 12 match: ['2010-01', '2010-02', '2010-03', '2010-04', '2010-05', '2010-06', '2010-07', '2010-08', '2010-09', '2010-10', '2010-11', '2010-12']",
+            "sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY 1 ORDER BY 1 ASC LIMIT 200",
+            "source": "offline",
+            "applied": [
+              "For questions like this, break it down by month."
+            ]
+          }
+        },
+        {
+          "role": "paraphrase",
+          "question": "Show me net revenue in 2011",
+          "reference_sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1",
+          "before": {
+            "passed": false,
+            "reason": "expected top 1 ['2011-01'], got rows [[9009870.97]]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "top 12 match: ['2011-01', '2011-02', '2011-03', '2011-04', '2011-05', '2011-06', '2011-07', '2011-08', '2011-09', '2011-10', '2011-11', '2011-12']",
+            "sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1 ASC LIMIT 200",
+            "source": "offline",
+            "applied": [
+              "For questions like this, break it down by month."
+            ]
+          }
+        },
+        {
+          "role": "control",
+          "question": "Show revenue for 2011 by country",
+          "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5",
+          "before": {
+            "passed": true,
+            "reason": "top 5 match: ['United Kingdom', 'Netherlands', 'EIRE', 'Germany', 'France']",
+            "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "top 5 match: ['United Kingdom', 'Netherlands', 'EIRE', 'Germany', 'France']",
+            "sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 10",
+            "source": "offline",
+            "applied": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "L04",
+      "type": "wrong_period",
+      "pattern": "\"Last year\" means the last 12 complete months, not calendar 2010",
+      "teach": {
+        "question": "How many orders did we get last year?",
+        "choice": "last-12",
+        "rationale": "Our year runs to the end of last month."
+      },
+      "learned": {
+        "id": "06ddf744ed",
+        "created_at": "2026-10-22T07:47:09+00:00",
+        "type": "wrong_period",
+        "choice": "last-12",
+        "choice_label": "The last 12 complete months",
+        "question": "How many orders did we get last year?",
+        "original_sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+        "corrected_sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'",
+        "rule": "When I say \u201clast year\u201d, use the last 12 complete months (Dec 2010 to Nov 2011).",
+        "rationale": "Our year runs to the end of last month.",
+        "override": {
+          "period": {
+            "start": "2010-12-01",
+            "end": "2011-12-01",
+            "label": "the last 12 complete months (Dec 2010 to Nov 2011)"
+          }
+        },
+        "term": "last year",
+        "title": "Orders (distinct sale invoices) in the last 12 complete months (Dec 2010 to Nov 2011)",
+        "assumptions": [],
+        "enabled": true
+      },
+      "taught_status": "success",
+      "original_sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+      "probes": [
+        {
+          "role": "repeat",
+          "question": "How many orders did we get last year?",
+          "reference_sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'",
+          "before": {
+            "passed": false,
+            "reason": "expected [19140], got [19994]",
+            "sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "matched [19140]",
+            "sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'",
+            "source": "learned",
+            "applied": [
+              "When I say \u201clast year\u201d, use the last 12 complete months (Dec 2010 to Nov 2011)."
+            ]
+          }
+        },
+        {
+          "role": "paraphrase",
+          "question": "What was net revenue last year?",
+          "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'",
+          "before": {
+            "passed": false,
+            "reason": "expected [9325141.98], got [9247658.1]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "matched [9325141.98]",
+            "sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'",
+            "source": "offline",
+            "applied": [
+              "When I say \u201clast year\u201d, use the last 12 complete months (Dec 2010 to Nov 2011)."
+            ]
+          }
+        },
+        {
+          "role": "paraphrase",
+          "question": "How many unique customers bought something last year?",
+          "reference_sql": "SELECT COUNT(DISTINCT customer_id) AS customers FROM transactions WHERE line_type = 'sale' AND customer_id IS NOT NULL AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'",
+          "before": {
+            "passed": false,
+            "reason": "expected [4297], got [4231]",
+            "sql": "SELECT COUNT(DISTINCT customer_id) AS customers FROM transactions WHERE line_type = 'sale' AND customer_id IS NOT NULL AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "matched [4297]",
+            "sql": "SELECT COUNT(DISTINCT customer_id) AS customers FROM transactions WHERE line_type = 'sale' AND customer_id IS NOT NULL AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'",
+            "source": "offline",
+            "applied": [
+              "When I say \u201clast year\u201d, use the last 12 complete months (Dec 2010 to Nov 2011)."
+            ]
+          }
+        },
+        {
+          "role": "control",
+          "question": "How many orders did we get in 2010?",
+          "reference_sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+          "before": {
+            "passed": true,
+            "reason": "matched [19994]",
+            "sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+            "source": "offline",
+            "applied": []
+          },
+          "after": {
+            "passed": true,
+            "reason": "matched [19994]",
+            "sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'",
+            "source": "offline",
+            "applied": []
+          }
+        }
+      ]
+    }
+  ]
+}

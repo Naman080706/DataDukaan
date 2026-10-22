@@ -2,21 +2,28 @@ import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronDown } from "lucide-react";
 import { AskResponse, Cell, downloadCSV, formatCell, prettyColumn } from "../api";
+import { ActionList } from "./Actions";
+import { ForecastChart, ForecastDetails } from "./Forecast";
 
-type Tab = "chart" | "table" | "sql" | "steps";
-const TAB_LABEL: Record<Tab, string> = { chart: "Chart", table: "Table", sql: "How it was worked out", steps: "Step by step" };
+type Tab = "chart" | "actions" | "table" | "sql" | "steps";
+const TAB_LABEL: Record<Tab, string> = { chart: "Chart", actions: "Actions", table: "Table", sql: "How it was worked out", steps: "Step by step" };
 
 export default function ResultView({ r }: { r: AskResponse }) {
   const sym = r.currency === "GBP" ? "£" : ""; // a user's own file: currency unknown, so no symbol
   const hasChart = r.chart_type !== "none";
-  const [tab, setTab] = useState<Tab>(hasChart ? "chart" : "table");
-  const tabs: Tab[] = hasChart ? ["chart", "table", "sql", "steps"] : ["table", "sql", "steps"];
+  // "Using what you taught me" is shown above the result with a link, so it isn't repeated here.
+  const assumptions = (r.assumptions ?? []).filter((a) => !a.startsWith("Using what you taught me"));
+  const isActions = r.kind === "actions" && !!r.action_plan;
+  const [tab, setTab] = useState<Tab>(isActions ? "actions" : hasChart ? "chart" : "table");
+  const tabs: Tab[] = isActions
+    ? ["actions", "table", "steps"]
+    : [...(hasChart ? (["chart"] as Tab[]) : []), "table", ...(r.sql ? (["sql"] as Tab[]) : []), "steps"];
 
   return (
     <div className="mt-5">
-      {r.assumptions?.length > 0 && (
+      {assumptions.length > 0 && (
         <ul className="margin-rule max-w-3xl space-y-1 text-[13.5px] leading-snug text-muted">
-          {r.assumptions.map((a, i) => (
+          {assumptions.map((a, i) => (
             <li key={i}>{a}</li>
           ))}
         </ul>
@@ -34,7 +41,22 @@ export default function ResultView({ r }: { r: AskResponse }) {
       </div>
       <div className="pt-4">
         {tab === "table" && <SortableTable columns={r.columns} rows={r.rows} currency={sym} />}
-        {tab === "chart" && <AutoChart r={r} />}
+        {tab === "chart" && (r.chart_type === "forecast" && r.forecast ? (
+          <>
+            <ForecastChart f={r.forecast} />
+            <ForecastDetails f={r.forecast} />
+          </>
+        ) : (
+          <AutoChart r={r} />
+        ))}
+        {tab === "actions" && r.action_plan && (
+          <div>
+            <ActionList plan={r.action_plan} limit={8} />
+            <a href="#/ahead" className="mt-3 inline-block text-[13px] font-medium text-carbon-deep underline-offset-2 hover:underline">
+              See every action, what was checked and the rules on Plan ahead
+            </a>
+          </div>
+        )}
         {tab === "sql" && (
           <div>
             <p className="mb-3 max-w-2xl text-[14px] leading-relaxed text-muted">
@@ -182,6 +204,11 @@ const STEP_LABEL: Record<string, string> = {
   saved_answer: "Reused the working from an earlier identical question",
   offline_engine: "Used backup mode (no AI)",
   refuse: "Turned down the request",
+  forecast: "Forecast the coming months from the monthly figures",
+  diagnose: "Checked products and countries against the shop's benchmarks",
+  recommend: "Turned the findings into a ranked list of actions",
+  check_claims: "Checked every statement in the answer against the result",
+  recall_corrections: "Used what you taught me in earlier corrections",
 };
 const STEP_COLOR: Record<string, string> = { ok: "bg-ledger", error: "bg-stamp", blocked: "bg-stamp", warn: "bg-carbon" };
 

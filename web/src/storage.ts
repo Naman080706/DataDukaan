@@ -1,4 +1,4 @@
-import type { AskResponse } from "./api";
+import type { AskResponse, Correction } from "./api";
 
 // Per-browser persistence. Storage can be missing or full (private windows, quotas),
 // so every access is wrapped and the app works without it.
@@ -70,4 +70,16 @@ export function loadProfile(email: string): Profile {
 export function storeProfile(email: string, profile: Profile) {
   write(key("profile", email), profile);
   window.dispatchEvent(new Event("datadukaan:profile"));
+}
+
+// Correction memory: what this user taught DataDukaan. Sent with every question; the server keeps none of it.
+const MAX_CORRECTIONS = 100;
+
+export function loadCorrections(email: string): Correction[] {
+  return read<Correction[]>(key("corrections", email), []);
+}
+
+export function storeCorrections(email: string, items: Correction[]) {
+  write(key("corrections", email), items.slice(0, MAX_CORRECTIONS));
+  window.dispatchEvent(new Event("datadukaan:corrections"));
 }

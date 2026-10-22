@@ -1,0 +1,50 @@
+[
+  {"id": "L01", "type": "wrong_metric", "pattern": "This shop means revenue before returns when it says \"sales\"",
+   "teach": {"question": "What were total sales in 2011?", "choice": "gross", "rationale": "For me, sales means what we sold, before returns."},
+   "probes": [
+     {"role": "repeat", "check": "scalar", "question": "What were total sales in 2011?",
+      "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'"},
+     {"role": "paraphrase", "check": "scalar", "question": "What were total sales in 2010?",
+      "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'"},
+     {"role": "paraphrase", "check": "scalar", "question": "Total sales for Germany in 2011?",
+      "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS gross_revenue_gbp FROM transactions WHERE line_type = 'sale' AND country = 'Germany' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'"},
+     {"role": "control", "check": "scalar", "question": "What was net revenue in 2011?",
+      "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01'"}
+   ]},
+  {"id": "L02", "type": "missing_exclusion", "pattern": "Country rankings should leave out the home market (UK)",
+   "teach": {"question": "Which country had the highest net revenue?", "choice": "uk", "rationale": "I want to see export markets; the UK always wins."},
+   "probes": [
+     {"role": "repeat", "check": "top_k", "question": "Which country had the highest net revenue?",
+      "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5"},
+     {"role": "paraphrase", "check": "top_k", "question": "Which countries generated the most revenue in 2011?",
+      "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5"},
+     {"role": "paraphrase", "check": "top_k", "question": "Top 5 countries by net revenue in 2010",
+      "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND country <> 'United Kingdom' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5"},
+     {"role": "control", "check": "top_k", "question": "Which products had the highest net revenue?",
+      "reference_sql": "SELECT stock_code, any_value(description) AS description, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND is_product GROUP BY stock_code ORDER BY net_revenue_gbp DESC LIMIT 5"}
+   ]},
+  {"id": "L03", "type": "wrong_grouping", "pattern": "\"Show revenue for a year\" means the month-by-month picture",
+   "teach": {"question": "Show revenue for 2011", "choice": "month", "rationale": "When I say show, I want to see each month."},
+   "probes": [
+     {"role": "repeat", "check": "top_k", "question": "Show revenue for 2011",
+      "reference_sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1"},
+     {"role": "paraphrase", "check": "top_k", "question": "Show revenue for 2010",
+      "reference_sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01' GROUP BY 1 ORDER BY 1"},
+     {"role": "paraphrase", "check": "top_k", "question": "Show me net revenue in 2011",
+      "reference_sql": "SELECT strftime(invoice_date, '%Y-%m') AS month, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY 1 ORDER BY 1"},
+     {"role": "control", "check": "top_k", "question": "Show revenue for 2011 by country",
+      "reference_sql": "SELECT country, ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2011-01-01' AND invoice_date < '2012-01-01' GROUP BY country ORDER BY net_revenue_gbp DESC LIMIT 5"}
+   ]},
+  {"id": "L04", "type": "wrong_period", "pattern": "\"Last year\" means the last 12 complete months, not calendar 2010",
+   "teach": {"question": "How many orders did we get last year?", "choice": "last-12", "rationale": "Our year runs to the end of last month."},
+   "probes": [
+     {"role": "repeat", "check": "scalar", "question": "How many orders did we get last year?",
+      "reference_sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'"},
+     {"role": "paraphrase", "check": "scalar", "question": "What was net revenue last year?",
+      "reference_sql": "SELECT ROUND(SUM(line_value), 2) AS net_revenue_gbp FROM transactions WHERE line_type IN ('sale', 'cancellation') AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'"},
+     {"role": "paraphrase", "check": "scalar", "question": "How many unique customers bought something last year?",
+      "reference_sql": "SELECT COUNT(DISTINCT customer_id) AS customers FROM transactions WHERE line_type = 'sale' AND customer_id IS NOT NULL AND invoice_date >= '2010-12-01' AND invoice_date < '2011-12-01'"},
+     {"role": "control", "check": "scalar", "question": "How many orders did we get in 2010?",
+      "reference_sql": "SELECT COUNT(DISTINCT invoice) AS orders FROM transactions WHERE line_type = 'sale' AND invoice_date >= '2010-01-01' AND invoice_date < '2011-01-01'"}
+   ]}
+]

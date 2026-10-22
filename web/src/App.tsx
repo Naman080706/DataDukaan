@@ -8,19 +8,24 @@ import Landing from "./components/Landing";
 import SignIn from "./components/SignIn";
 import Profile from "./components/Profile";
 import YourData from "./components/YourData";
+import PlanAhead from "./components/PlanAhead";
+import Learned from "./components/Learned";
 import { useUserData, UserDataState } from "./userData";
 import { loadProfile } from "./storage";
 
 // Hash routes keep this a static site (no server rewrites needed on Vercel).
-type Route = "home" | "signin" | "ask" | "data" | "tests" | "rules" | "profile";
+type Route = "home" | "signin" | "ask" | "data" | "ahead" | "learned" | "tests" | "rules" | "profile";
 const ROUTES: Record<string, Route> = {
-  "": "home", "#/": "home", "#/signin": "signin", "#/ask": "ask", "#/data": "data", "#/tests": "tests", "#/rules": "rules", "#/profile": "profile",
+  "": "home", "#/": "home", "#/signin": "signin", "#/ask": "ask", "#/data": "data", "#/ahead": "ahead", "#/learned": "learned",
+  "#/tests": "tests", "#/rules": "rules", "#/profile": "profile",
 };
-const NEEDS_SIGN_IN: Route[] = ["ask", "data", "tests", "rules", "profile"];
+const NEEDS_SIGN_IN: Route[] = ["ask", "data", "ahead", "learned", "tests", "rules", "profile"];
 
 const NAV: { route: Route; label: string }[] = [
   { route: "ask", label: "Ask" },
   { route: "data", label: "Your data" },
+  { route: "ahead", label: "Plan ahead" },
+  { route: "learned", label: "What I've learned" },
   { route: "tests", label: "Trap tests" },
   { route: "rules", label: "How we count" },
 ];
@@ -86,14 +91,14 @@ export default function App() {
               <span className="mt-1 block text-[13px] text-muted">Ask the shop's sales ledger in plain English</span>
             </span>
           </a>
-          <nav className="flex flex-1 gap-6" role="tablist">
+          <nav className="order-last flex w-full flex-wrap gap-x-6 gap-y-1 xl:order-none xl:w-auto xl:flex-1" role="tablist">
             {NAV.map(({ route: r, label }) => (
               <a key={r} href={`#/${r}`} role="tab" aria-selected={route === r} className="tab text-[15px]">
                 {label}
               </a>
             ))}
           </nav>
-          <div className="flex items-end gap-6 pb-3">
+          <div className="ml-auto flex items-end gap-6 pb-3 xl:ml-0">
             <DatasetStatus health={health} userData={userData} />
             {session && <ProfileLink email={session.email} active={route === "profile"} />}
           </div>
@@ -108,6 +113,8 @@ export default function App() {
           />
         )}
         {route === "data" && session && <YourData email={session.email} data={userData} />}
+        {route === "ahead" && <PlanAhead />}
+        {route === "learned" && session && <Learned key={session.email} email={session.email} />}
         {route === "tests" && <Evaluation />}
         {route === "rules" && <DataRules />}
         {route === "profile" && session && <Profile session={session} />}

@@ -3,13 +3,28 @@ import json
 import os
 from datetime import datetime, timezone
 
-from . import db
-from .agent import ask
+from . import db, sql_facts
+from .agent import ask, correct
+from .claims import CLAIM_CATEGORIES, check_answer
+from .offline import _known_countries
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SUITE_PATH = os.path.join(ROOT, "eval", "trap_suite.json")
 RESULTS_PATH = os.path.join(ROOT, "eval", "results.json")
 OFFLINE_RESULTS_PATH = os.path.join(ROOT, "eval", "results_offline.json")
+CLAIM_SUITE_PATH = os.path.join(ROOT, "eval", "claim_suite.json")
+
+# Why a test failed, beyond pass/fail. The SQL categories come from comparing the agent's SQL with the reference.
+FAILURE_TYPES = {
+    **sql_facts.CATEGORIES,
+    "wrong_result_other": "Wrong result, other cause",
+    "did_not_ask_back": "Guessed instead of asking back",
+    "unneeded_ask_back": "Asked back when the rules already answer it",
+    "not_refused": "Did not refuse an unsafe request",
+    "service_unavailable": "AI service unavailable",
+    "sql_error": "Calculation failed to run",
+    "misread_result": CLAIM_CATEGORIES["misread_result"],
+}
 
 # Engines compared on the Trap tests page. "groq" is recorded with Gemini disabled (no live mode).
 ENGINES = {
@@ -97,12 +112,40 @@ def compare(test: dict, expected: dict | None, actual: dict) -> tuple[bool, str]
     return False, f"unknown check {check}"
 
 
-def run_test(test: dict, mode: str = "llm") -> dict:
+def failure_type(test: dict, actual: dict, passed: bool) -> tuple[str | None, list[str]]:
+    """(main failure category, every SQL difference from the reference) for one test."""
+    check, status = test["check"], actual.get("status")
+    diffs = sql_facts.diff(test["reference_sql"], actual["sql"]) if test.get("reference_sql") and actual.get("sql") else []
+    if passed:
+        return None, diffs
+    if check == "clarify":
+        return "did_not_ask_back", diffs
+    if check == "blocked":
+        return "not_refused", diffs
+    if status == "clarification":
+        return "unneeded_ask_back", diffs
+    if status == "unavailable":
+        return "service_unavailable", diffs
+    if status != "success":
+        return "sql_error", diffs
+    return (diffs[0] if diffs else "wrong_result_other"), diffs
+
+
+def answer_check(actual: dict) -> dict | None:
+    """The claim check of the written answer; the AI's first draft if it was rewritten (that is what we grade)."""
+    c = actual.get("draft_claims") or actual.get("claims")
+    if not c:
+        return None
+    return {"status": c["status"], "categories": c["categories"], "counts": c["counts"],
+            "rewritten": "draft_claims" in actual, "draft_answer": actual.get("draft_answer")}
+
+
+def run_test(test: dict, mode: str = "llm", check_answers: bool = False) -> dict:
     expected = db.execute_readonly_sql(test["reference_sql"]) if test.get("reference_sql") else None
     # Saved answers are bypassed so the suite always tests the engine itself.
     # "chain" is the app's real path (Gemini, then Groq, then offline) minus saved answers.
     ask_mode = "auto" if mode == "chain" else mode
-    actual = ask(test["question"], summarize=False, mode=ask_mode, use_cache=False)
+    actual = ask(test["question"], summarize=check_answers, mode=ask_mode, use_cache=False)
     first = None
     if test["check"].startswith("clarify_then_"):
         # Two-turn test: the agent must ask back first, then answer correctly once the user picks an option.
@@ -111,12 +154,17 @@ def run_test(test: dict, mode: str = "llm") -> dict:
             passed, reason = False, f"did not ask back first (status={actual.get('status')})"
         else:
             history = [{"role": "user", "content": test["question"]}, {"role": "assistant", "content": actual.get("answer", "")}]
-            actual = ask(test["followup"], history, summarize=False, mode=ask_mode, use_cache=False)
+            actual = ask(test["followup"], history, summarize=check_answers, mode=ask_mode, use_cache=False)
             passed, reason = compare(test, expected, actual)
             reason = f"asked back, then after '{test['followup']}': {reason}"
     else:
         passed, reason = compare(test, expected, actual)
+    ftype, diffs = failure_type(test, actual, passed)
+    answer = answer_check(actual)
+    if passed and answer and answer["status"] in ("contradicted", "unsupported"):
+        ftype = "misread_result"  # right numbers, but the written answer misstated them
     return {
+        "failure_type": ftype, "failure_label": FAILURE_TYPES.get(ftype), "sql_differences": diffs, "answer_check": answer,
         "id": test["id"], "question": test["question"], "category": test["category"], "check": test["check"],
         "challenge": test.get("challenge"), "passed": passed, "reason": reason,
         "followup": test.get("followup"), "first_turn": first,
@@ -138,13 +186,97 @@ def summarise_run(results: list[dict], mode: str = "llm") -> dict:
         "passed": sum(r["passed"] for r in results),
         "execution_accuracy": round(sum(r["passed"] for r in results) / len(results), 3) if results else 0,
         "clarification_rate": round(sum(r["passed"] for r in amb) / len(amb), 3) if amb else None,
+        "failure_types": {k: sum(r.get("failure_type") == k for r in results) for k in FAILURE_TYPES
+                          if any(r.get("failure_type") == k for r in results)},
         "results": results,
     }
 
 
-def run_suite(ids: list[str] | None = None, mode: str = "llm") -> dict:
+def run_suite(ids: list[str] | None = None, mode: str = "llm", check_answers: bool = False) -> dict:
     tests = [t for t in load_suite() if not ids or t["id"] in ids]
-    return summarise_run([run_test(t, mode) for t in tests], mode)
+    return summarise_run([run_test(t, mode, check_answers) for t in tests], mode)
+
+
+LEARNING_SUITE_PATH = os.path.join(ROOT, "eval", "learning_suite.json")
+
+
+def load_learning_suite() -> list[dict]:
+    with open(LEARNING_SUITE_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def run_learning_scenario(sc: dict, mode: str = "offline") -> dict:
+    """Teach one correction, then ask its probes with and without it remembered.
+
+    "repeat" and "paraphrase" probes should flip from fail to pass; "control" probes are questions the
+    correction must NOT change, so they should pass both times.
+    """
+    ask_mode = "offline" if mode == "offline" else "llm"
+    teach = sc["teach"]
+    original = ask(teach["question"], summarize=False, mode=ask_mode, use_cache=False)
+    taught = correct(teach["question"], original.get("sql"), sc["type"], teach["choice"], teach["rationale"],
+                     mode="offline" if mode == "offline" else "auto")
+    memory_ = [taught["correction"]] if taught.get("correction") else []
+    probes = []
+    for p in sc["probes"]:
+        expected = db.execute_readonly_sql(p["reference_sql"])
+        row = {"role": p["role"], "question": p["question"], "reference_sql": p["reference_sql"]}
+        for phase, mem in (("before", []), ("after", memory_)):
+            actual = ask(p["question"], summarize=False, mode=ask_mode, use_cache=False, corrections=mem)
+            ok, reason = compare(p, expected, actual)
+            row[phase] = {"passed": ok, "reason": reason, "sql": actual.get("sql"), "source": actual.get("source"),
+                          "applied": [c["rule"] for c in actual.get("applied_corrections", [])]}
+        probes.append(row)
+    return {"id": sc["id"], "type": sc["type"], "pattern": sc["pattern"], "teach": teach,
+            "learned": taught.get("correction"), "taught_status": taught["status"], "original_sql": original.get("sql"),
+            "probes": probes}
+
+
+def summarise_learning(scenarios: list[dict], mode: str) -> dict:
+    probes = [p for s in scenarios for p in s["probes"]]
+    learn = [p for p in probes if p["role"] != "control"]
+    control = [p for p in probes if p["role"] == "control"]
+    count = lambda ps, phase: sum(p[phase]["passed"] for p in ps)  # noqa: E731
+    return {"mode": mode, "run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "learn_total": len(learn), "learn_before": count(learn, "before"), "learn_after": count(learn, "after"),
+            "control_total": len(control), "control_before": count(control, "before"), "control_after": count(control, "after"),
+            "scenarios": scenarios}
+
+
+def run_learning_suite(ids: list[str] | None = None, mode: str = "offline") -> dict:
+    return summarise_learning([run_learning_scenario(s, mode) for s in load_learning_suite() if not ids or s["id"] in ids], mode)
+
+
+def learning_results_path(mode: str) -> str:
+    return os.path.join(ROOT, "eval", f"results_learning_{'offline' if mode == 'offline' else 'llm'}.json")
+
+
+def load_learning_results(mode: str) -> dict | None:
+    path = learning_results_path(mode)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def run_claim_suite() -> dict:
+    """Planted-error answers: does the claim checker catch each kind of fluent guess, and leave correct answers alone?"""
+    with open(CLAIM_SUITE_PATH, encoding="utf-8") as f:
+        cases = json.load(f)
+    results = []
+    for c in cases:
+        r = db.execute_readonly_sql(c["sql"])
+        out = check_answer(c["answer"], r["columns"], r["rows"], c["sql"], c["question"], [], None, _known_countries())
+        want = c["expect"]
+        passed = out["status"] == want["status"] and set(want.get("categories", [])) <= set(out["categories"])
+        results.append({"id": c["id"], "planted": c["planted"], "answer": c["answer"], "question": c["question"],
+                        "expected": want, "got": {"status": out["status"], "categories": out["categories"]},
+                        "claims": out["claims"], "passed": passed})
+    planted = [r for r in results if r["expected"]["status"] != "grounded"]
+    return {"total": len(results), "passed": sum(r["passed"] for r in results),
+            "caught": sum(r["passed"] for r in planted), "planted": len(planted),
+            "false_alarms": sum(not r["passed"] for r in results if r["expected"]["status"] == "grounded"),
+            "categories": CLAIM_CATEGORIES, "results": results}
 
 
 def load_results(mode: str = "llm") -> dict | None:

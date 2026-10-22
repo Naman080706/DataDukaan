@@ -19,8 +19,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request  # noqa: E4
 from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from backend import auth, client_agent, db, evaluation  # noqa: E402
-from backend.agent import ask  # noqa: E402
+from backend import actions, auth, client_agent, db, evaluation, forecast, memory  # noqa: E402
+from backend.agent import ask, correct  # noqa: E402
 from backend.rules import AMBIGUITY_RULES, DATA_RULES, DATASET_END, DATASET_START, NON_PRODUCT_CODES  # noqa: E402
 
 app = FastAPI(title="DataDukaan API", version="1.0")
@@ -50,6 +50,22 @@ class Turn(BaseModel):
     sql: str | None = None
 
 
+class Correction(BaseModel):
+    """One remembered correction. Kept in the user's browser and sent with each question (the server stores none)."""
+    id: str = Field(max_length=40)
+    type: Literal["wrong_metric", "wrong_period", "wrong_grouping", "missing_exclusion", "other"]
+    question: str = Field(max_length=1000)
+    rule: str = Field(max_length=500)
+    rationale: str = Field(default="", max_length=1000)
+    original_sql: str | None = Field(default=None, max_length=6000)
+    corrected_sql: str | None = Field(default=None, max_length=6000)  # re-validated before it is ever run
+    override: dict = {}
+    term: str | None = Field(default=None, max_length=60)
+    title: str = Field(default="", max_length=300)
+    assumptions: list[str] = []
+    enabled: bool = True
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
     conversation_id: str | None = None
@@ -57,6 +73,24 @@ class AskRequest(BaseModel):
     inject_fault: bool = False
     # "auto": saved answers, then AI, then offline engine. "offline": rule engine only (outage demo).
     mode: Literal["auto", "offline"] = "auto"
+    corrections: list[Correction] = Field(default=[], max_length=100)
+
+
+class CorrectRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    original_sql: str | None = Field(default=None, max_length=6000)
+    type: Literal["wrong_metric", "wrong_period", "wrong_grouping", "missing_exclusion", "other"]
+    choice: str | None = Field(default=None, max_length=40)
+    rationale: str = Field(default="", max_length=1000)
+    history: list[Turn] = []
+    mode: Literal["auto", "offline"] = "auto"
+
+
+class ForecastRequest(BaseModel):
+    metric: Literal["net_revenue", "units_sold", "orders", "returned_units", "return_value"] = "net_revenue"
+    scope: Literal["total", "country", "product"] = "total"
+    key: str | None = Field(default=None, max_length=100)
+    horizon: int = Field(default=3, ge=1, le=6)
 
 
 class CodeRequest(BaseModel):
@@ -123,6 +157,7 @@ class DatasetSummaryRequest(BaseModel):
 class EvalRequest(BaseModel):
     ids: list[str] | None = None
     mode: Literal["llm", "offline"] = "llm"
+    check_answers: bool = False  # also write and claim-check the answer (one more AI call per test)
 
 
 @app.get("/api/health")
@@ -165,7 +200,8 @@ def rules(user: dict = Signed):
 
 @app.post("/api/ask")
 def ask_endpoint(req: AskRequest, user: dict = Signed):
-    result = ask(req.question.strip(), [t.model_dump() for t in req.history], inject_fault=req.inject_fault, mode=req.mode)
+    result = ask(req.question.strip(), [t.model_dump() for t in req.history], inject_fault=req.inject_fault, mode=req.mode,
+                 corrections=[c.model_dump() for c in req.corrections])
     qid = uuid.uuid4().hex[:12]
     result["id"] = qid
     result["conversation_id"] = req.conversation_id
@@ -191,6 +227,48 @@ def dataset_summarise(req: DatasetSummaryRequest, user: dict = Signed):
     return client_agent.summarise(req.question, req.title, req.assumptions, req.columns, req.rows, req.source, req.total_rows)
 
 
+@app.get("/api/corrections/options")
+def correction_options(user: dict = Signed):
+    """The structured choices offered under each kind of correction."""
+    return {"types": memory.TYPES,
+            "choices": {kind: [{"key": k, "label": v[0]} for k, v in opts.items()] for kind, opts in memory.CHOICES.items()}}
+
+
+@app.post("/api/correct")
+def correct_endpoint(req: CorrectRequest, user: dict = Signed):
+    """Work out the corrected answer and the correction to remember. Nothing is stored until the browser keeps it."""
+    out = correct(req.question.strip(), req.original_sql, req.type, req.choice, req.rationale,
+                  [t.model_dump() for t in req.history], req.mode)
+    if out.get("result"):
+        out["result"]["id"] = uuid.uuid4().hex[:12]
+        HISTORY[out["result"]["id"]] = out["result"]
+    return out
+
+
+@app.post("/api/forecast")
+def forecast_endpoint(req: ForecastRequest, user: dict = Signed):
+    try:
+        return forecast.forecast(req.metric, req.scope, req.key, req.horizon)
+    except forecast.ForecastError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/forecast/entities")
+def forecast_entities(user: dict = Signed):
+    """Countries and the top products, for the forecast pickers."""
+    countries = db.execute_readonly_sql("SELECT country FROM transactions GROUP BY country ORDER BY SUM(line_value) DESC")["rows"]
+    products = db.execute_readonly_sql(
+        "SELECT stock_code, mode(description) FILTER (WHERE line_type = 'sale') FROM transactions WHERE line_type = 'sale' AND is_product "
+        "AND invoice_date >= '2010-12-01' GROUP BY stock_code ORDER BY SUM(line_value) DESC LIMIT 100")["rows"]
+    return {"countries": [r[0] for r in countries], "products": [{"code": r[0], "description": r[1]} for r in products],
+            "metrics": {k: {"label": v[2], "unit": v[3]} for k, v in forecast.METRICS.items()}}
+
+
+@app.get("/api/actions")
+def actions_endpoint(user: dict = Signed):
+    return actions.action_plan(limit=25)
+
+
 @app.get("/api/query/{qid}")
 def get_query(qid: str, user: dict = Signed):
     if qid not in HISTORY:
@@ -206,7 +284,37 @@ def suite(user: dict = Signed):
 @app.post("/api/evaluation/run")
 def run_eval(req: EvalRequest, user: dict = Signed):
     # The UI runs one test per request so long suites never hit serverless time limits.
-    return evaluation.run_suite(req.ids, req.mode)
+    return evaluation.run_suite(req.ids, req.mode, req.check_answers)
+
+
+class LearningRequest(BaseModel):
+    ids: list[str] | None = None
+    mode: Literal["llm", "offline"] = "offline"
+
+
+@app.get("/api/evaluation/learning/suite")
+def learning_suite(user: dict = Signed):
+    return evaluation.load_learning_suite()
+
+
+@app.post("/api/evaluation/learning")
+def run_learning(req: LearningRequest, user: dict = Signed):
+    """Teach each scenario's correction and compare its probes before and after (the UI sends one scenario per request)."""
+    return evaluation.run_learning_suite(req.ids, req.mode)
+
+
+@app.get("/api/evaluation/learning/results")
+def learning_results(mode: Literal["llm", "offline"] = "offline", user: dict = Signed):
+    res = evaluation.load_learning_results(mode)
+    if res is None:
+        raise HTTPException(404, "No saved learning run yet.")
+    return res
+
+
+@app.get("/api/evaluation/claims")
+def eval_claims(user: dict = Signed):
+    """Runs the planted-error claim suite live (no AI calls, so it is fast)."""
+    return evaluation.run_claim_suite()
 
 
 @app.get("/api/evaluation/results")
